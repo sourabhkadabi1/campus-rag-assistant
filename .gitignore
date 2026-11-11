@@ -1,0 +1,29 @@
+# Environment
+.env
+
+# Node / Next.js
+node_modules/
+.next/
+
+# Project data
+data/
+uploads/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
