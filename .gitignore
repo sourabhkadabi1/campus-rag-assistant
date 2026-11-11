@@ -6,6 +6,7 @@ node_modules/
 .next/
 
 # Project data
+PROJECT.md
 data/
 uploads/
 
@@ -27,3 +28,4 @@ venv/
 # OS
 .DS_Store
 Thumbs.db
+
