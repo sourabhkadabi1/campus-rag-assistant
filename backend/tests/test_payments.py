@@ -17,12 +17,13 @@ import pytest
 # ╚════════════════════════════════════════════════════════════════╝
 
 
+def _make_signature(order_id: str, payment_id: str, secret: str) -> str:
+    message = f"{order_id}|{payment_id}"
+    return hmac.new(secret.encode(), message.encode(), hashlib.sha256).hexdigest()
+
+
 class TestSignatureVerification:
     """Test Razorpay HMAC-SHA256 signature verification."""
-
-    def _make_signature(self, order_id: str, payment_id: str, secret: str) -> str:
-        message = f"{order_id}|{payment_id}"
-        return hmac.new(secret.encode(), message.encode(), hashlib.sha256).hexdigest()
 
     def test_valid_signature(self):
         from app.services.payment import verify_signature
@@ -30,7 +31,7 @@ class TestSignatureVerification:
         secret = "test_secret_123"
         order_id = "order_abc"
         payment_id = "pay_xyz"
-        sig = self._make_signature(order_id, payment_id, secret)
+        sig = _make_signature(order_id, payment_id, secret)
 
         with patch("app.services.payment.settings") as mock_settings:
             mock_settings.razorpay_key_secret = secret
@@ -56,106 +57,108 @@ class TestSignatureVerification:
 # ╚════════════════════════════════════════════════════════════════╝
 
 
-class TestProcessPayment:
-    """Test payment processing with mocked database."""
+@pytest.fixture
+def payment_mocks():
+    """Patch DB helpers for payment tests."""
+    mock_execute = AsyncMock()
+    mock_fetchrow = AsyncMock()
+    mock_fetchval = AsyncMock()
 
-    @pytest.fixture(autouse=True)
-    def _patch(self):
-        self.mock_execute = AsyncMock()
-        self.mock_fetchrow = AsyncMock()
-        self.mock_fetchval = AsyncMock()
-
-        with patch("app.services.payment.execute", self.mock_execute), \
-             patch("app.services.payment.fetchrow", self.mock_fetchrow), \
-             patch("app.services.payment.fetchval", self.mock_fetchval):
-            yield
-
-    @pytest.mark.asyncio
-    async def test_process_valid_payment(self):
-        from app.services.payment import process_payment
-
-        secret = "test_secret"
-        order_id = "order_123"
-        payment_id = "pay_456"
-        sig = hmac.new(
-            secret.encode(),
-            f"{order_id}|{payment_id}".encode(),
-            hashlib.sha256,
-        ).hexdigest()
-
-        self.mock_fetchrow.return_value = {
-            "id": "pay-record-id",
-            "user_id": "user-uuid",
-            "plan_name": "paid",
-            "plan_duration_days": 30,
-            "status": "created",
-            "plan_id": "plan-uuid",
+    with patch("app.services.payment.execute", mock_execute), \
+         patch("app.services.payment.fetchrow", mock_fetchrow), \
+         patch("app.services.payment.fetchval", mock_fetchval):
+        yield {
+            "execute": mock_execute,
+            "fetchrow": mock_fetchrow,
+            "fetchval": mock_fetchval,
         }
 
-        with patch("app.services.payment.settings") as mock_settings:
-            mock_settings.razorpay_key_secret = secret
-            result = await process_payment(order_id, payment_id, sig)
 
-        assert result["status"] == "paid"
-        assert result["plan_name"] == "paid"
-        assert "expires_at" in result
+async def test_process_valid_payment(payment_mocks):
+    from app.services.payment import process_payment
 
-    @pytest.mark.asyncio
-    async def test_process_invalid_signature_raises(self):
-        from app.services.payment import process_payment
+    secret = "test_secret"
+    order_id = "order_123"
+    payment_id = "pay_456"
+    sig = hmac.new(
+        secret.encode(),
+        f"{order_id}|{payment_id}".encode(),
+        hashlib.sha256,
+    ).hexdigest()
 
-        with patch("app.services.payment.settings") as mock_settings:
-            mock_settings.razorpay_key_secret = "test_secret"
-            with pytest.raises(ValueError, match="Invalid payment signature"):
-                await process_payment("order_123", "pay_456", "bad_sig")
+    payment_mocks["fetchrow"].return_value = {
+        "id": "pay-record-id",
+        "user_id": "user-uuid",
+        "plan_name": "paid",
+        "plan_duration_days": 30,
+        "status": "created",
+        "plan_id": "plan-uuid",
+    }
 
-    @pytest.mark.asyncio
-    async def test_process_already_paid_is_idempotent(self):
-        from app.services.payment import process_payment
+    with patch("app.services.payment.settings") as mock_settings:
+        mock_settings.razorpay_key_secret = secret
+        result = await process_payment(order_id, payment_id, sig)
 
-        secret = "test_secret"
-        order_id = "order_123"
-        payment_id = "pay_456"
-        sig = hmac.new(
-            secret.encode(),
-            f"{order_id}|{payment_id}".encode(),
-            hashlib.sha256,
-        ).hexdigest()
+    assert result["status"] == "paid"
+    assert result["plan_name"] == "paid"
+    assert "expires_at" in result
 
-        self.mock_fetchrow.return_value = {
-            "id": "pay-record-id",
-            "user_id": "user-uuid",
-            "plan_name": "paid",
-            "plan_duration_days": 30,
-            "status": "paid",  # already processed
-            "plan_id": "plan-uuid",
-        }
 
-        with patch("app.services.payment.settings") as mock_settings:
-            mock_settings.razorpay_key_secret = secret
-            result = await process_payment(order_id, payment_id, sig)
+async def test_process_invalid_signature_raises(payment_mocks):
+    from app.services.payment import process_payment
 
-        assert result["status"] == "already_processed"
+    with patch("app.services.payment.settings") as mock_settings:
+        mock_settings.razorpay_key_secret = "test_secret"
+        with pytest.raises(ValueError, match="Invalid payment signature"):
+            await process_payment("order_123", "pay_456", "bad_sig")
 
-    @pytest.mark.asyncio
-    async def test_process_missing_order_raises(self):
-        from app.services.payment import process_payment
 
-        secret = "test_secret"
-        order_id = "order_unknown"
-        payment_id = "pay_456"
-        sig = hmac.new(
-            secret.encode(),
-            f"{order_id}|{payment_id}".encode(),
-            hashlib.sha256,
-        ).hexdigest()
+async def test_process_already_paid_is_idempotent(payment_mocks):
+    from app.services.payment import process_payment
 
-        self.mock_fetchrow.return_value = None
+    secret = "test_secret"
+    order_id = "order_123"
+    payment_id = "pay_456"
+    sig = hmac.new(
+        secret.encode(),
+        f"{order_id}|{payment_id}".encode(),
+        hashlib.sha256,
+    ).hexdigest()
 
-        with patch("app.services.payment.settings") as mock_settings:
-            mock_settings.razorpay_key_secret = secret
-            with pytest.raises(ValueError, match="not found"):
-                await process_payment(order_id, payment_id, sig)
+    payment_mocks["fetchrow"].return_value = {
+        "id": "pay-record-id",
+        "user_id": "user-uuid",
+        "plan_name": "paid",
+        "plan_duration_days": 30,
+        "status": "paid",  # already processed
+        "plan_id": "plan-uuid",
+    }
+
+    with patch("app.services.payment.settings") as mock_settings:
+        mock_settings.razorpay_key_secret = secret
+        result = await process_payment(order_id, payment_id, sig)
+
+    assert result["status"] == "already_processed"
+
+
+async def test_process_missing_order_raises(payment_mocks):
+    from app.services.payment import process_payment
+
+    secret = "test_secret"
+    order_id = "order_unknown"
+    payment_id = "pay_456"
+    sig = hmac.new(
+        secret.encode(),
+        f"{order_id}|{payment_id}".encode(),
+        hashlib.sha256,
+    ).hexdigest()
+
+    payment_mocks["fetchrow"].return_value = None
+
+    with patch("app.services.payment.settings") as mock_settings:
+        mock_settings.razorpay_key_secret = secret
+        with pytest.raises(ValueError, match="not found"):
+            await process_payment(order_id, payment_id, sig)
 
 
 # ╔════════════════════════════════════════════════════════════════╗

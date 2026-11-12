@@ -112,131 +112,138 @@ class TestBotProtection:
 # ╚════════════════════════════════════════════════════════════════╝
 
 
-class TestQuotaConsume:
-    """Test atomic quota consume logic with mocked database calls."""
+@pytest.fixture
+def quota_mocks():
+    """Patch all database functions used by quota module."""
+    mock_execute = AsyncMock(return_value="UPDATE 1")
+    mock_fetchrow = AsyncMock()
+    mock_fetchval = AsyncMock()
 
-    @pytest.fixture(autouse=True)
-    def _patch_db(self):
-        """Patch all database functions used by quota module."""
-        self.mock_execute = AsyncMock(return_value="UPDATE 1")
-        self.mock_fetchrow = AsyncMock()
-        self.mock_fetchval = AsyncMock()
-
-        with patch("app.services.quota.execute", self.mock_execute), \
-             patch("app.services.quota.fetchrow", self.mock_fetchrow), \
-             patch("app.services.quota.fetchval", self.mock_fetchval), \
-             patch("app.services.quota.fetch", AsyncMock(return_value=[])):
-            yield
-
-    @pytest.mark.asyncio
-    async def test_consume_success(self):
-        """Consuming quota returns True and updated usage."""
-        from app.services.quota import consume_quota
-
-        # Mock: row exists after upsert, update succeeds
-        self.mock_fetchrow.return_value = {
-            "requests_used": 1, "tokens_used": 0, "cache_hits": 0,
+    with patch("app.services.quota.execute", mock_execute), \
+         patch("app.services.quota.fetchrow", mock_fetchrow), \
+         patch("app.services.quota.fetchval", mock_fetchval), \
+         patch("app.services.quota.fetch", AsyncMock(return_value=[])):
+        yield {
+            "execute": mock_execute,
+            "fetchrow": mock_fetchrow,
+            "fetchval": mock_fetchval,
         }
 
-        ok, usage = await consume_quota("user1", 10, 40000)
-        assert ok is True
-        assert usage["requests_used"] == 1
 
-    @pytest.mark.asyncio
-    async def test_consume_requests_exceeded(self):
-        """Returns False when request limit is reached."""
-        from app.services.quota import consume_quota
+async def test_consume_success(quota_mocks):
+    """Consuming quota returns True and updated usage."""
+    from app.services.quota import consume_quota
 
-        # First call (upsert) returns None, second call (update) returns None
-        # meaning the WHERE clause didn't match
-        self.mock_fetchrow.side_effect = [
-            None,  # UPDATE returns no rows (quota exceeded)
-            {"requests_used": 10, "tokens_used": 5000, "cache_hits": 3},  # SELECT
-        ]
+    # Mock: row exists after upsert, update succeeds
+    quota_mocks["fetchrow"].return_value = {
+        "requests_used": 1, "tokens_used": 0, "cache_hits": 0,
+    }
 
-        ok, usage = await consume_quota("user1", 10, 40000)
-        assert ok is False
-        assert usage["reason"] == "requests_exceeded"
-        assert usage["requests_used"] == 10
+    ok, usage = await consume_quota("user1", 10, 40000)
+    assert ok is True
+    assert usage["requests_used"] == 1
 
-    @pytest.mark.asyncio
-    async def test_consume_tokens_exceeded(self):
-        """Returns False when token limit is reached (and refunds request)."""
-        from app.services.quota import consume_quota
 
-        # UPDATE succeeds but tokens_used >= tokens_limit
-        self.mock_fetchrow.return_value = {
-            "requests_used": 5, "tokens_used": 40000, "cache_hits": 2,
+async def test_consume_requests_exceeded(quota_mocks):
+    """Returns False when request limit is reached."""
+    from app.services.quota import consume_quota
+
+    # First call (upsert) returns None, second call (update) returns None
+    # meaning the WHERE clause didn't match
+    quota_mocks["fetchrow"].side_effect = [
+        None,  # UPDATE returns no rows (quota exceeded)
+        {"requests_used": 10, "tokens_used": 5000, "cache_hits": 3},  # SELECT
+    ]
+
+    ok, usage = await consume_quota("user1", 10, 40000)
+    assert ok is False
+    assert usage["reason"] == "requests_exceeded"
+    assert usage["requests_used"] == 10
+
+
+async def test_consume_tokens_exceeded(quota_mocks):
+    """Returns False when token limit is reached (and refunds request)."""
+    from app.services.quota import consume_quota
+
+    # UPDATE succeeds but tokens_used >= tokens_limit
+    quota_mocks["fetchrow"].return_value = {
+        "requests_used": 5, "tokens_used": 40000, "cache_hits": 2,
+    }
+
+    ok, usage = await consume_quota("user1", 10, 40000)
+    assert ok is False
+    assert usage["reason"] == "tokens_exceeded"
+    # Should have called execute to refund
+    refund_calls = [
+        c for c in quota_mocks["execute"].call_args_list
+        if "GREATEST" in str(c)
+    ]
+    assert len(refund_calls) >= 1
+
+
+async def test_refund_quota(quota_mocks):
+    """Refund decrements counters."""
+    from app.services.quota import refund_quota
+
+    await refund_quota("user1", requests=1, tokens=500)
+
+    # Should have called execute with GREATEST(0, ...)
+    calls = [str(c) for c in quota_mocks["execute"].call_args_list]
+    assert any("GREATEST" in c for c in calls)
+
+
+# ╔════════════════════════════════════════════════════════════════╗
+# ║  Quota remaining tests (mocked DB)                           ║
+# ╚════════════════════════════════════════════════════════════════╝
+
+
+@pytest.fixture
+def remaining_mocks():
+    """Patch for remaining quota tests."""
+    mock_fetchrow = AsyncMock()
+    mock_fetchval = AsyncMock()
+
+    with patch("app.services.quota.execute", AsyncMock()), \
+         patch("app.services.quota.fetchrow", mock_fetchrow), \
+         patch("app.services.quota.fetchval", mock_fetchval), \
+         patch("app.services.quota.fetch", AsyncMock(return_value=[])), \
+         patch("app.services.quota.should_use_retrieval_only", AsyncMock(return_value=False)):
+        yield {
+            "fetchrow": mock_fetchrow,
+            "fetchval": mock_fetchval,
         }
 
-        ok, usage = await consume_quota("user1", 10, 40000)
-        assert ok is False
-        assert usage["reason"] == "tokens_exceeded"
-        # Should have called execute to refund
-        refund_calls = [
-            c for c in self.mock_execute.call_args_list
-            if "GREATEST" in str(c)
-        ]
-        assert len(refund_calls) >= 1
 
-    @pytest.mark.asyncio
-    async def test_refund_quota(self):
-        """Refund decrements counters."""
-        from app.services.quota import refund_quota
+async def test_remaining_with_usage(remaining_mocks):
+    from app.services.quota import get_remaining
 
-        await refund_quota("user1", requests=1, tokens=500)
+    # Mock get_user_plan
+    remaining_mocks["fetchrow"].side_effect = [
+        # get_user_plan query
+        {"plan_name": "free", "requests_per_day": 10, "tokens_per_day": 40000,
+         "features": "{}", "plan_expires_at": None},
+        # usage query
+        {"requests_used": 3, "tokens_used": 12000, "cache_hits": 2},
+    ]
 
-        # Should have called execute with GREATEST(0, ...)
-        calls = [str(c) for c in self.mock_execute.call_args_list]
-        assert any("GREATEST" in c for c in calls)
+    result = await get_remaining("user1")
+    assert result["requests_remaining"] == 7
+    assert result["tokens_remaining"] == 28000
+    assert result["plan_name"] == "free"
 
 
-class TestQuotaRemaining:
-    """Test get_remaining returns correct values."""
+async def test_remaining_no_usage_yet(remaining_mocks):
+    from app.services.quota import get_remaining
 
-    @pytest.fixture(autouse=True)
-    def _patch(self):
-        self.mock_fetchrow = AsyncMock()
-        self.mock_fetchval = AsyncMock()
+    remaining_mocks["fetchrow"].side_effect = [
+        {"plan_name": "paid", "requests_per_day": 50, "tokens_per_day": 150000,
+         "features": "{}", "plan_expires_at": None},
+        None,  # no usage row yet
+    ]
 
-        with patch("app.services.quota.execute", AsyncMock()), \
-             patch("app.services.quota.fetchrow", self.mock_fetchrow), \
-             patch("app.services.quota.fetchval", self.mock_fetchval), \
-             patch("app.services.quota.fetch", AsyncMock(return_value=[])), \
-             patch("app.services.quota.should_use_retrieval_only", AsyncMock(return_value=False)):
-            yield
-
-    @pytest.mark.asyncio
-    async def test_remaining_with_usage(self):
-        from app.services.quota import get_remaining
-
-        # Mock get_user_plan
-        self.mock_fetchrow.side_effect = [
-            # get_user_plan query
-            {"plan_name": "free", "requests_per_day": 10, "tokens_per_day": 40000,
-             "features": "{}", "plan_expires_at": None},
-            # usage query
-            {"requests_used": 3, "tokens_used": 12000, "cache_hits": 2},
-        ]
-
-        result = await get_remaining("user1")
-        assert result["requests_remaining"] == 7
-        assert result["tokens_remaining"] == 28000
-        assert result["plan_name"] == "free"
-
-    @pytest.mark.asyncio
-    async def test_remaining_no_usage_yet(self):
-        from app.services.quota import get_remaining
-
-        self.mock_fetchrow.side_effect = [
-            {"plan_name": "paid", "requests_per_day": 50, "tokens_per_day": 150000,
-             "features": "{}", "plan_expires_at": None},
-            None,  # no usage row yet
-        ]
-
-        result = await get_remaining("user1")
-        assert result["requests_remaining"] == 50
-        assert result["tokens_remaining"] == 150000
+    result = await get_remaining("user1")
+    assert result["requests_remaining"] == 50
+    assert result["tokens_remaining"] == 150000
 
 
 # ╔════════════════════════════════════════════════════════════════╗
@@ -244,63 +251,67 @@ class TestQuotaRemaining:
 # ╚════════════════════════════════════════════════════════════════╝
 
 
-class TestPlanExpiry:
-    @pytest.fixture(autouse=True)
-    def _patch(self):
-        self.mock_fetchrow = AsyncMock()
-        self.mock_fetchval = AsyncMock(return_value="free-plan-id")
-        self.mock_execute = AsyncMock()
+@pytest.fixture
+def plan_mocks():
+    """Patch for plan expiry tests."""
+    mock_fetchrow = AsyncMock()
+    mock_fetchval = AsyncMock(return_value="free-plan-id")
+    mock_execute = AsyncMock()
 
-        with patch("app.services.quota.execute", self.mock_execute), \
-             patch("app.services.quota.fetchrow", self.mock_fetchrow), \
-             patch("app.services.quota.fetchval", self.mock_fetchval):
-            yield
-
-    @pytest.mark.asyncio
-    async def test_expired_plan_falls_back_to_free(self):
-        from app.services.quota import get_user_plan
-
-        expired_time = datetime.now(timezone.utc) - timedelta(days=1)
-        self.mock_fetchrow.return_value = {
-            "plan_name": "paid",
-            "requests_per_day": 50,
-            "tokens_per_day": 150000,
-            "features": "{}",
-            "plan_expires_at": expired_time,
+    with patch("app.services.quota.execute", mock_execute), \
+         patch("app.services.quota.fetchrow", mock_fetchrow), \
+         patch("app.services.quota.fetchval", mock_fetchval):
+        yield {
+            "fetchrow": mock_fetchrow,
+            "fetchval": mock_fetchval,
+            "execute": mock_execute,
         }
 
-        plan = await get_user_plan("user1")
-        assert plan["plan_name"] == "free"
-        assert plan["requests_per_day"] == 10
-        assert plan["is_paid"] is False
 
-    @pytest.mark.asyncio
-    async def test_active_plan_returns_paid(self):
-        from app.services.quota import get_user_plan
+async def test_expired_plan_falls_back_to_free(plan_mocks):
+    from app.services.quota import get_user_plan
 
-        future_time = datetime.now(timezone.utc) + timedelta(days=15)
-        self.mock_fetchrow.return_value = {
-            "plan_name": "paid",
-            "requests_per_day": 50,
-            "tokens_per_day": 150000,
-            "features": '{"quiz_generation": true}',
-            "plan_expires_at": future_time,
-        }
+    expired_time = datetime.now(timezone.utc) - timedelta(days=1)
+    plan_mocks["fetchrow"].return_value = {
+        "plan_name": "paid",
+        "requests_per_day": 50,
+        "tokens_per_day": 150000,
+        "features": "{}",
+        "plan_expires_at": expired_time,
+    }
 
-        plan = await get_user_plan("user1")
-        assert plan["plan_name"] == "paid"
-        assert plan["requests_per_day"] == 50
-        assert plan["is_paid"] is True
-        assert plan["features"]["quiz_generation"] is True
+    plan = await get_user_plan("user1")
+    assert plan["plan_name"] == "free"
+    assert plan["requests_per_day"] == 10
+    assert plan["is_paid"] is False
 
-    @pytest.mark.asyncio
-    async def test_no_profile_returns_free(self):
-        from app.services.quota import get_user_plan
 
-        self.mock_fetchrow.return_value = None
+async def test_active_plan_returns_paid(plan_mocks):
+    from app.services.quota import get_user_plan
 
-        plan = await get_user_plan("unknown_user")
-        assert plan["plan_name"] == "free"
+    future_time = datetime.now(timezone.utc) + timedelta(days=15)
+    plan_mocks["fetchrow"].return_value = {
+        "plan_name": "paid",
+        "requests_per_day": 50,
+        "tokens_per_day": 150000,
+        "features": '{"quiz_generation": true}',
+        "plan_expires_at": future_time,
+    }
+
+    plan = await get_user_plan("user1")
+    assert plan["plan_name"] == "paid"
+    assert plan["requests_per_day"] == 50
+    assert plan["is_paid"] is True
+    assert plan["features"]["quiz_generation"] is True
+
+
+async def test_no_profile_returns_free(plan_mocks):
+    from app.services.quota import get_user_plan
+
+    plan_mocks["fetchrow"].return_value = None
+
+    plan = await get_user_plan("unknown_user")
+    assert plan["plan_name"] == "free"
 
 
 # ╔════════════════════════════════════════════════════════════════╗
@@ -308,61 +319,59 @@ class TestPlanExpiry:
 # ╚════════════════════════════════════════════════════════════════╝
 
 
-class TestBudgetGuard:
-    @pytest.mark.asyncio
-    async def test_paid_users_never_affected(self):
-        from app.services.quota import should_use_retrieval_only
+async def test_paid_users_never_affected():
+    from app.services.quota import should_use_retrieval_only
 
-        with patch("app.services.quota.get_budget_guard_settings", AsyncMock(return_value={
-            "is_enabled": True, "threshold_pct": 0.9,
-            "manual_retrieval_only": True, "monthly_spend_cap_usd": 0,
-        })):
-            result = await should_use_retrieval_only(is_paid=True)
-            assert result is False
+    with patch("app.services.quota.get_budget_guard_settings", AsyncMock(return_value={
+        "is_enabled": True, "threshold_pct": 0.9,
+        "manual_retrieval_only": True, "monthly_spend_cap_usd": 0,
+    })):
+        result = await should_use_retrieval_only(is_paid=True)
+        assert result is False
 
-    @pytest.mark.asyncio
-    async def test_manual_retrieval_only_affects_free(self):
-        from app.services.quota import should_use_retrieval_only
 
-        with patch("app.services.quota.get_budget_guard_settings", AsyncMock(return_value={
-            "is_enabled": False, "threshold_pct": 0.9,
-            "manual_retrieval_only": True, "monthly_spend_cap_usd": 0,
-        })):
-            result = await should_use_retrieval_only(is_paid=False)
-            assert result is True
+async def test_manual_retrieval_only_affects_free():
+    from app.services.quota import should_use_retrieval_only
 
-    @pytest.mark.asyncio
-    async def test_budget_guard_below_threshold_allows(self):
-        from app.services.quota import should_use_retrieval_only
+    with patch("app.services.quota.get_budget_guard_settings", AsyncMock(return_value={
+        "is_enabled": False, "threshold_pct": 0.9,
+        "manual_retrieval_only": True, "monthly_spend_cap_usd": 0,
+    })):
+        result = await should_use_retrieval_only(is_paid=False)
+        assert result is True
 
-        with patch("app.services.quota.get_budget_guard_settings", AsyncMock(return_value={
-            "is_enabled": True, "threshold_pct": 0.9,
-            "manual_retrieval_only": False, "monthly_spend_cap_usd": 0,
-        })), patch("app.services.quota.get_capacity_used_pct", AsyncMock(return_value=0.5)):
-            result = await should_use_retrieval_only(is_paid=False)
-            assert result is False
 
-    @pytest.mark.asyncio
-    async def test_budget_guard_above_threshold_blocks_free(self):
-        from app.services.quota import should_use_retrieval_only
+async def test_budget_guard_below_threshold_allows():
+    from app.services.quota import should_use_retrieval_only
 
-        with patch("app.services.quota.get_budget_guard_settings", AsyncMock(return_value={
-            "is_enabled": True, "threshold_pct": 0.9,
-            "manual_retrieval_only": False, "monthly_spend_cap_usd": 0,
-        })), patch("app.services.quota.get_capacity_used_pct", AsyncMock(return_value=0.95)):
-            result = await should_use_retrieval_only(is_paid=False)
-            assert result is True
+    with patch("app.services.quota.get_budget_guard_settings", AsyncMock(return_value={
+        "is_enabled": True, "threshold_pct": 0.9,
+        "manual_retrieval_only": False, "monthly_spend_cap_usd": 0,
+    })), patch("app.services.quota.get_capacity_used_pct", AsyncMock(return_value=0.5)):
+        result = await should_use_retrieval_only(is_paid=False)
+        assert result is False
 
-    @pytest.mark.asyncio
-    async def test_budget_guard_disabled_allows(self):
-        from app.services.quota import should_use_retrieval_only
 
-        with patch("app.services.quota.get_budget_guard_settings", AsyncMock(return_value={
-            "is_enabled": False, "threshold_pct": 0.9,
-            "manual_retrieval_only": False, "monthly_spend_cap_usd": 0,
-        })), patch("app.services.quota.get_capacity_used_pct", AsyncMock(return_value=0.99)):
-            result = await should_use_retrieval_only(is_paid=False)
-            assert result is False
+async def test_budget_guard_above_threshold_blocks_free():
+    from app.services.quota import should_use_retrieval_only
+
+    with patch("app.services.quota.get_budget_guard_settings", AsyncMock(return_value={
+        "is_enabled": True, "threshold_pct": 0.9,
+        "manual_retrieval_only": False, "monthly_spend_cap_usd": 0,
+    })), patch("app.services.quota.get_capacity_used_pct", AsyncMock(return_value=0.95)):
+        result = await should_use_retrieval_only(is_paid=False)
+        assert result is True
+
+
+async def test_budget_guard_disabled_allows():
+    from app.services.quota import should_use_retrieval_only
+
+    with patch("app.services.quota.get_budget_guard_settings", AsyncMock(return_value={
+        "is_enabled": False, "threshold_pct": 0.9,
+        "manual_retrieval_only": False, "monthly_spend_cap_usd": 0,
+    })), patch("app.services.quota.get_capacity_used_pct", AsyncMock(return_value=0.99)):
+        result = await should_use_retrieval_only(is_paid=False)
+        assert result is False
 
 
 # ╔════════════════════════════════════════════════════════════════╗
@@ -370,53 +379,45 @@ class TestBudgetGuard:
 # ╚════════════════════════════════════════════════════════════════╝
 
 
-class TestConcurrentQuota:
+async def test_concurrent_requests_respect_limit():
     """
-    Verify that concurrent requests cannot exceed the quota limit.
-
-    Uses a simulated atomic counter to model the SQL behavior.
+    Simulate 20 concurrent consume_quota calls with a limit of 10.
+    At most 10 should succeed.
     """
+    counter = {"value": 0}
+    lock = asyncio.Lock()
 
-    @pytest.mark.asyncio
-    async def test_concurrent_requests_respect_limit(self):
-        """
-        Simulate 20 concurrent consume_quota calls with a limit of 10.
-        At most 10 should succeed.
-        """
-        counter = {"value": 0}
-        lock = asyncio.Lock()
+    async def mock_fetchrow_atomic(*args, **kwargs):
+        query = args[0] if args else ""
+        if "UPDATE" in query and "requests_used" in query:
+            async with lock:
+                if counter["value"] < 10:  # limit
+                    counter["value"] += 1
+                    return {
+                        "requests_used": counter["value"],
+                        "tokens_used": 0,
+                        "cache_hits": 0,
+                    }
+                return None  # quota exceeded
+        elif "SELECT" in query:
+            return {
+                "requests_used": counter["value"],
+                "tokens_used": 0,
+                "cache_hits": 0,
+            }
+        return None
 
-        async def mock_fetchrow_atomic(*args, **kwargs):
-            query = args[0] if args else ""
-            if "UPDATE" in query and "requests_used" in query:
-                async with lock:
-                    if counter["value"] < 10:  # limit
-                        counter["value"] += 1
-                        return {
-                            "requests_used": counter["value"],
-                            "tokens_used": 0,
-                            "cache_hits": 0,
-                        }
-                    return None  # quota exceeded
-            elif "SELECT" in query:
-                return {
-                    "requests_used": counter["value"],
-                    "tokens_used": 0,
-                    "cache_hits": 0,
-                }
-            return None
+    with patch("app.services.quota.execute", AsyncMock()), \
+         patch("app.services.quota.fetchrow", mock_fetchrow_atomic), \
+         patch("app.services.quota.fetchval", AsyncMock()):
+        from app.services.quota import consume_quota
 
-        with patch("app.services.quota.execute", AsyncMock()), \
-             patch("app.services.quota.fetchrow", mock_fetchrow_atomic), \
-             patch("app.services.quota.fetchval", AsyncMock()):
-            from app.services.quota import consume_quota
+        results = await asyncio.gather(
+            *[consume_quota("user1", 10, 40000) for _ in range(20)]
+        )
 
-            results = await asyncio.gather(
-                *[consume_quota("user1", 10, 40000) for _ in range(20)]
-            )
+        successes = sum(1 for ok, _ in results if ok)
+        failures = sum(1 for ok, _ in results if not ok)
 
-            successes = sum(1 for ok, _ in results if ok)
-            failures = sum(1 for ok, _ in results if not ok)
-
-            assert successes == 10, f"Expected 10 successes, got {successes}"
-            assert failures == 10, f"Expected 10 failures, got {failures}"
+        assert successes == 10, f"Expected 10 successes, got {successes}"
+        assert failures == 10, f"Expected 10 failures, got {failures}"

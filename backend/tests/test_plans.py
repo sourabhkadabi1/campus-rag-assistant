@@ -75,39 +75,45 @@ class TestPlanModels:
             )
 
 
-class TestGrantPlanManually:
-    """Test manual plan granting logic."""
+# ╔════════════════════════════════════════════════════════════════╗
+# ║  Grant plan manually tests (mocked DB)                       ║
+# ╚════════════════════════════════════════════════════════════════╝
 
-    @pytest.fixture(autouse=True)
-    def _patch(self):
-        self.mock_fetchrow = AsyncMock()
-        self.mock_execute = AsyncMock()
 
-        with patch("app.services.payment.execute", self.mock_execute), \
-             patch("app.services.payment.fetchrow", self.mock_fetchrow), \
-             patch("app.services.payment.fetchval", AsyncMock()):
-            yield
+@pytest.fixture
+def grant_mocks():
+    """Patch DB helpers for grant tests."""
+    mock_fetchrow = AsyncMock()
+    mock_execute = AsyncMock()
 
-    @pytest.mark.asyncio
-    async def test_grant_success(self):
-        from app.services.payment import grant_plan_manually
+    with patch("app.services.payment.execute", mock_execute), \
+         patch("app.services.payment.fetchrow", mock_fetchrow), \
+         patch("app.services.payment.fetchval", AsyncMock()):
+        yield {
+            "fetchrow": mock_fetchrow,
+            "execute": mock_execute,
+        }
 
-        self.mock_fetchrow.return_value = {"id": "plan-id", "name": "paid"}
 
-        results = await grant_plan_manually(
-            user_ids=["user1", "user2"],
-            plan_name="paid",
-            duration_days=30,
-        )
-        assert len(results) == 2
-        assert results[0]["plan_name"] == "paid"
-        assert "expires_at" in results[0]
+async def test_grant_success(grant_mocks):
+    from app.services.payment import grant_plan_manually
 
-    @pytest.mark.asyncio
-    async def test_grant_unknown_plan_raises(self):
-        from app.services.payment import grant_plan_manually
+    grant_mocks["fetchrow"].return_value = {"id": "plan-id", "name": "paid"}
 
-        self.mock_fetchrow.return_value = None
+    results = await grant_plan_manually(
+        user_ids=["user1", "user2"],
+        plan_name="paid",
+        duration_days=30,
+    )
+    assert len(results) == 2
+    assert results[0]["plan_name"] == "paid"
+    assert "expires_at" in results[0]
 
-        with pytest.raises(ValueError, match="not found"):
-            await grant_plan_manually(["user1"], "nonexistent", 30)
+
+async def test_grant_unknown_plan_raises(grant_mocks):
+    from app.services.payment import grant_plan_manually
+
+    grant_mocks["fetchrow"].return_value = None
+
+    with pytest.raises(ValueError, match="not found"):
+        await grant_plan_manually(["user1"], "nonexistent", 30)
