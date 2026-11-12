@@ -31,7 +31,7 @@ def load_model():
     name = settings.embedding_model_name
     logger.info("Loading embedding model: %s …", name)
     _model = SentenceTransformer(name)
-    dim = _model.get_sentence_embedding_dimension()
+    dim = getattr(_model, "get_embedding_dimension", _model.get_sentence_embedding_dimension)()
     logger.info("Embedding model ready  (dimension=%d)", dim)
     return _model
 
@@ -55,4 +55,4 @@ def get_embeddings_batch(
 def get_dimension() -> int:
     """Return the embedding dimension (384 for bge-small)."""
     model = load_model()
-    return model.get_sentence_embedding_dimension()
+    return getattr(model, "get_embedding_dimension", model.get_sentence_embedding_dimension)()

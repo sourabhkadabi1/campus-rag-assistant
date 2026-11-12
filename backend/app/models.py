@@ -126,3 +126,118 @@ class UnitChapterMapCreate(BaseModel):
     chapter_no: int = Field(..., ge=1)
     chapter_title: Optional[str] = None
     document_id: Optional[UUID] = None
+
+
+# ── Phase 4: Quotas, plans, payments ─────────────────────────────
+
+
+class PlanResponse(BaseModel):
+    """A subscription plan returned to students or admins."""
+    id: UUID
+    name: str
+    display_name: str
+    requests_per_day: int
+    tokens_per_day: int
+    features: dict = Field(default_factory=dict)
+    is_default: bool = False
+    created_at: Optional[datetime] = None
+
+    model_config = {"from_attributes": True}
+
+
+class PlanCreateRequest(BaseModel):
+    """Admin request to create a new plan."""
+    name: str = Field(..., min_length=1, max_length=50)
+    display_name: str = Field(..., min_length=1, max_length=100)
+    requests_per_day: int = Field(..., ge=1)
+    tokens_per_day: int = Field(..., ge=1000)
+    features: dict = Field(default_factory=dict)
+    is_default: bool = False
+
+
+class PlanUpdateRequest(BaseModel):
+    """Admin request to update a plan."""
+    display_name: Optional[str] = Field(None, min_length=1, max_length=100)
+    requests_per_day: Optional[int] = Field(None, ge=1)
+    tokens_per_day: Optional[int] = Field(None, ge=1000)
+    features: Optional[dict] = None
+    is_default: Optional[bool] = None
+
+
+class QuotaRemainingResponse(BaseModel):
+    """Returned with every /ask response and from GET /quota/remaining."""
+    requests_remaining: int
+    tokens_remaining: int
+    requests_limit: int
+    tokens_limit: int
+    requests_used: int
+    tokens_used: int
+    cache_hits_today: int = 0
+    plan_name: str = "free"
+    is_retrieval_only: bool = False
+    resets_at: Optional[str] = None  # ISO 8601
+
+
+class UsageResponse(BaseModel):
+    """Daily usage detail."""
+    date: str
+    requests_used: int
+    tokens_used: int
+    cache_hits: int
+
+
+class PlanGrantRequest(BaseModel):
+    """Admin request to manually grant a plan to user(s)."""
+    user_ids: list[UUID]
+    plan_name: str = Field(..., min_length=1)
+    duration_days: int = Field(default=30, ge=1, le=3650)
+
+
+class PaymentOrderRequest(BaseModel):
+    """Student request to start Razorpay checkout."""
+    plan_name: str = Field(default="paid", min_length=1)
+
+
+class PaymentOrderResponse(BaseModel):
+    """Returned after creating a Razorpay order."""
+    order_id: str
+    amount_paise: int
+    currency: str = "INR"
+    key_id: str
+    plan_name: str
+    plan_display_name: str
+
+
+class PaymentWebhookPayload(BaseModel):
+    """Razorpay webhook payload (simplified)."""
+    razorpay_order_id: str
+    razorpay_payment_id: str
+    razorpay_signature: str
+
+
+class PaymentRecord(BaseModel):
+    """A single payment record."""
+    id: UUID
+    user_id: UUID
+    razorpay_order_id: str
+    razorpay_payment_id: Optional[str] = None
+    plan_name: str
+    amount_paise: int
+    currency: str = "INR"
+    status: str
+    plan_starts_at: Optional[datetime] = None
+    plan_expires_at: Optional[datetime] = None
+    created_at: Optional[datetime] = None
+
+    model_config = {"from_attributes": True}
+
+
+class BudgetGuardStatus(BaseModel):
+    """Current global budget guard state."""
+    is_active: bool
+    manual_retrieval_only: bool = False
+    capacity_used_pct: float
+    threshold_pct: float
+    free_users_affected: bool
+    monthly_spend_usd: float = 0.0
+    monthly_cap_usd: float = 0.0

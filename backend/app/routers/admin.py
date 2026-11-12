@@ -1,5 +1,6 @@
 """
-Admin router — document upload, ingestion status, document listing.
+Admin router — document upload, ingestion status, document listing,
+budget guard management (Phase 4).
 """
 
 from __future__ import annotations
@@ -419,3 +420,39 @@ def _row_to_doc(row) -> DocumentResponse:
         ingestion_error=row["ingestion_error"],
         created_at=row["created_at"],
     )
+
+
+# ── Budget guard management (Phase 4) ────────────────────────────
+
+
+@router.get("/budget-guard")
+async def get_budget_guard():
+    """Get current budget guard status including capacity usage."""
+    from app.services.quota import get_budget_guard_status
+    return await get_budget_guard_status()
+
+
+@router.post("/budget-guard")
+async def update_budget_guard_settings(
+    request: Request,
+    is_enabled: bool | None = None,
+    manual_retrieval_only: bool | None = None,
+    threshold_pct: float | None = None,
+    monthly_spend_cap_usd: float | None = None,
+):
+    """
+    Update budget guard settings (admin only).
+
+    Set ``manual_retrieval_only=true`` for exam-week mode (all FREE users
+    get retrieval-only answers regardless of capacity).
+    """
+    from app.services.quota import update_budget_guard
+    admin_id = request.headers.get("X-User-Id")
+    result = await update_budget_guard(
+        is_enabled=is_enabled,
+        manual_retrieval_only=manual_retrieval_only,
+        threshold_pct=threshold_pct,
+        monthly_spend_cap_usd=monthly_spend_cap_usd,
+        updated_by=admin_id,
+    )
+    return result
