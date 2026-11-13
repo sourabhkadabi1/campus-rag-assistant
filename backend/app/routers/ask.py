@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import time
 from typing import Optional
 
@@ -24,7 +25,7 @@ from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 from sse_starlette.sse import EventSourceResponse
 
-from app.config import settings
+from app.config import DETAILED_KEYWORDS, DETAILED_WORD_THRESHOLD, RESPONSE_PROFILES, settings
 from app.database import fetch, fetchrow
 from app.services.answer_cache import (
     CachedAnswer,
@@ -37,12 +38,17 @@ from app.services.llm_router import route_and_generate
 from app.services.query_logger import log_query
 from app.services.retrieval import RetrievalResult, hybrid_search
 from app.services.quota import (
+    check_thinking_conditions,
+    compute_cost_usd,
     consume_quota,
+    consume_thinking_credit,
+    deduct_balance,
     get_remaining,
     get_user_plan,
     record_cache_hit,
     record_tokens,
     refund_quota,
+    refund_thinking_credit,
     should_use_retrieval_only,
 )
 from app.services.abuse import check_user_rate_limit
@@ -59,6 +65,25 @@ class AskRequest(BaseModel):
     question: str = Field(..., min_length=1, max_length=2000)
     session_id: Optional[str] = None
     detailed: bool = False
+    thinking: bool = False  # Explicit thinking-mode toggle (paid users only)
+
+
+# ── Detailed detection (no LLM call) ─────────────────────────────
+
+
+def detect_detailed(question: str) -> bool:
+    """
+    Detect whether a question is "detailed" based on keywords or word count.
+
+    A question is detailed if it contains any keyword from DETAILED_KEYWORDS
+    OR has more than DETAILED_WORD_THRESHOLD words.
+    """
+    lower = question.lower()
+    for keyword in DETAILED_KEYWORDS:
+        if keyword in lower:
+            return True
+    word_count = len(question.split())
+    return word_count > DETAILED_WORD_THRESHOLD
 
 
 # ── Special-route helpers (zero LLM calls) ───────────────────────
@@ -249,7 +274,7 @@ async def ask(request: Request, body: AskRequest):
             "headers (auth tokens in production).",
         )
 
-    # ── Per-user per-minute abuse rate limit (Phase 4) ────
+    # ── Per-user per-minute abuse rate limit ──────────────
     if user_id:
         ok, count = check_user_rate_limit(user_id)
         if not ok:
@@ -261,7 +286,9 @@ async def ask(request: Request, body: AskRequest):
 
     question = body.question
     session_id = body.session_id
-    detailed = body.detailed
+    # Auto-detect detailed based on keywords/word count
+    is_detailed = detect_detailed(question) or body.detailed
+    thinking_requested = body.thinking
 
     # ── SSE event generator ───────────────────────────────
     async def event_generator():  # noqa: C901 — orchestration is inherently complex
@@ -271,10 +298,17 @@ async def ask(request: Request, body: AskRequest):
         provider: Optional[str] = None
         input_tokens: Optional[int] = None
         output_tokens: Optional[int] = None
+        thinking_tokens: int = 0
         full_answer = ""
         citations: list[dict] = []
         error_msg: Optional[str] = None
         cache_hit = False
+        cost_usd: float = 0.0
+        units_charged: int = 1
+        actual_thinking_mode = False
+        thinking_reason_code: Optional[str] = None
+        quota_consumed = False
+        thinking_credit_consumed = False
 
         try:
             # ──── 1. Parse filters ────────────────────────
@@ -415,19 +449,58 @@ async def ask(request: Request, body: AskRequest):
                     yield {"event": "done", "data": "{}"}
                     return
 
-            # ──── 4. Quota check (Phase 4) ─────────────────
-            #  Happens BEFORE the LLM call. Cache/summary/syllabus
-            #  routes above do NOT reach this point (they return early).
-            quota_consumed = False
+            # ──── 4. Plan + profile selection ──────────────
             plan_info: dict = {"plan_name": "free", "is_paid": False,
-                               "requests_per_day": 10, "tokens_per_day": 40_000}
+                               "requests_per_day": 10, "tokens_per_day": 40_000,
+                               "thinking_credits_per_day": 0}
             if user_id:
                 try:
                     plan_info = await get_user_plan(user_id)
+                except Exception:
+                    pass
+
+            is_paid = plan_info.get("is_paid", False)
+            plan_type = "paid" if is_paid else "free"
+
+            # Select response profile: (plan_type, is_detailed) → {chunks, max_output, units}
+            profile = RESPONSE_PROFILES.get(
+                (plan_type, is_detailed),
+                {"chunks": 3, "max_output": 600, "units": 1},
+            )
+            profile_chunks = profile["chunks"]
+            profile_max_output = profile["max_output"]
+            units_charged = profile["units"]
+
+            # ──── 4a. Thinking mode check ─────────────────
+            use_thinking = False
+            thinking_config: dict | None = None
+            if thinking_requested:
+                if not is_paid:
+                    # Free users can't use thinking mode — silently degrade
+                    thinking_reason_code = "not_paid"
+                else:
+                    ok, reason = await check_thinking_conditions(user_id, plan_info)
+                    if ok:
+                        use_thinking = True
+                        units_charged = 3  # Thinking costs 3 quota units
+                        thinking_config = {
+                            "thinkingBudget": settings.thinking_budget_tokens,
+                        }
+                    else:
+                        thinking_reason_code = reason
+
+            # ──── 4b. Quota check ─────────────────────────
+            #  Happens BEFORE the LLM call. Cache/summary/syllabus
+            #  routes above do NOT reach this point (they return early).
+            quota_consumed = False
+            thinking_credit_consumed = False
+            if user_id:
+                try:
                     ok, usage = await consume_quota(
                         user_id,
                         plan_info["requests_per_day"],
                         plan_info["tokens_per_day"],
+                        units=units_charged,
                     )
                     if not ok:
                         reason = usage.get("reason", "quota_exceeded")
@@ -452,13 +525,33 @@ async def ask(request: Request, body: AskRequest):
                         error_msg = msg
                         return
                     quota_consumed = True
+
+                    # Consume thinking credit if using thinking mode
+                    if use_thinking:
+                        daily_limit = plan_info.get("thinking_credits_per_day", 0) or settings.thinking_daily_per_user
+                        credit_ok, _ = await consume_thinking_credit(user_id, daily_limit)
+                        if not credit_ok:
+                            # Can't consume credit — fall back to normal paid chain
+                            use_thinking = False
+                            thinking_config = None
+                            thinking_reason_code = "daily_limit_reached"
+                            # Refund the extra units (charged 3, should be normal profile units)
+                            normal_units = RESPONSE_PROFILES.get((plan_type, is_detailed), {}).get("units", 1)
+                            extra = units_charged - normal_units
+                            if extra > 0:
+                                await refund_quota(user_id, units=extra)
+                            units_charged = normal_units
+                        else:
+                            thinking_credit_consumed = True
+
                 except Exception as exc:
                     # Quota service unavailable — allow the request
                     logger.warning("Quota check failed, allowing request: %s", exc)
 
-            # ──── 4b. Budget guard (Phase 4) ──────────────
+            # ──── 4c. Budget guard ────────────────────────
             #  When combined free-tier capacity is ≥90%, FREE users get
-            #  retrieval-only answers.  PAID users are unaffected.
+            #  retrieval-only answers.  PAID users are unaffected unless
+            #  balance is below PAID_MIN_BALANCE_USD.
             force_retrieval_only = False
             if user_id:
                 try:
@@ -469,12 +562,6 @@ async def ask(request: Request, body: AskRequest):
                     pass
 
             # ──── 5. Hybrid retrieval ─────────────────────
-            limit = (
-                settings.retrieval_top_k_detailed
-                if detailed
-                else settings.retrieval_top_k
-            )
-
             chunks, fallback_msg = await hybrid_search(
                 query=parsed.clean_query,
                 semester=semester,
@@ -482,7 +569,7 @@ async def ask(request: Request, body: AskRequest):
                 subject=parsed.subject,
                 chapter_no=parsed.chapter_no,
                 unit_chapters=parsed.matched_chapters_from_unit or None,
-                limit=limit,
+                limit=profile_chunks,
             )
 
             if fallback_msg:
@@ -509,7 +596,7 @@ async def ask(request: Request, body: AskRequest):
 
             citations = _build_citations(chunks)
 
-            # ──── 5b. Budget guard: retrieval-only for free users ──
+            # ──── 5b. Budget guard: retrieval-only ────────
             if force_retrieval_only:
                 from app.services.llm_router import build_retrieval_fallback
                 route_type = "retrieval_only_budget"
@@ -536,18 +623,27 @@ async def ask(request: Request, body: AskRequest):
                 # Refund the quota since we didn't actually call an LLM
                 if quota_consumed and user_id:
                     try:
-                        await refund_quota(user_id, requests=1)
+                        await refund_quota(user_id, units=units_charged)
                         quota_consumed = False
+                        if thinking_credit_consumed:
+                            await refund_thinking_credit(user_id)
+                            thinking_credit_consumed = False
                     except Exception:
                         pass
                 yield {"event": "done", "data": "{}"}
                 return
 
-            # ──── 6. Routed LLM call (Phase 3) ────────────
+            # ──── 6. Routed LLM call ──────────────────────
             yield {
                 "event": "route",
                 "data": json.dumps({"route": "llm"}),
             }
+
+            # Select API key based on plan
+            if is_paid:
+                api_key = settings.gemini_api_key_paid
+            else:
+                api_key = settings.gemini_api_key_free
 
             # Chat history (last 2 turns)
             history: list[dict] = []
@@ -566,17 +662,25 @@ async def ask(request: Request, body: AskRequest):
                 except Exception:
                     pass
 
-            # Use the Phase 3 router — walks MODEL_CHAIN, handles
-            # fallback, queuing, prompt budgeting, and rate limits.
+            # Use the router — walks chain, handles failover, queuing,
+            # prompt budgeting, and rate limits.
             async for event in route_and_generate(
                 chunks=chunks,
                 question=parsed.clean_query,
                 history=history,
-                detailed=detailed,
+                detailed=is_detailed,
+                is_paid=is_paid,
+                api_key=api_key,
+                thinking_mode=use_thinking,
+                thinking_config=thinking_config,
+                max_output_tokens=profile_max_output,
+                profile_chunks=profile_chunks,
             ):
                 if event["type"] == "model_selected":
                     model_used = event["model_id"]
                     provider = event["provider"]
+                    if use_thinking:
+                        actual_thinking_mode = True
                 elif event["type"] == "token":
                     yield {
                         "event": "token",
@@ -586,6 +690,7 @@ async def ask(request: Request, body: AskRequest):
                 elif event["type"] == "usage":
                     input_tokens = event.get("input_tokens")
                     output_tokens = event.get("output_tokens")
+                    thinking_tokens = event.get("thinking_tokens", 0)
                 elif event["type"] == "queue_position":
                     yield {
                         "event": "queue",
@@ -596,6 +701,26 @@ async def ask(request: Request, body: AskRequest):
                             ),
                         }),
                     }
+                elif event["type"] == "thinking_fallback":
+                    # Thinking model failed — falling back to normal chain
+                    actual_thinking_mode = False
+                    thinking_reason_code = event.get("reason", "thinking_busy")
+                    # Refund thinking credit since it wasn't used
+                    if thinking_credit_consumed and user_id:
+                        try:
+                            await refund_thinking_credit(user_id)
+                            thinking_credit_consumed = False
+                        except Exception:
+                            pass
+                    # Refund extra units (charged 3, should be normal)
+                    if units_charged > profile["units"]:
+                        extra = units_charged - profile["units"]
+                        if extra > 0 and user_id:
+                            try:
+                                await refund_quota(user_id, units=extra)
+                            except Exception:
+                                pass
+                        units_charged = profile["units"]
                 elif event["type"] == "retrieval_fallback":
                     yield {
                         "event": "token",
@@ -603,6 +728,10 @@ async def ask(request: Request, body: AskRequest):
                     }
                     full_answer += event["text"]
                     route_type = "retrieval_fallback"
+                elif event["type"] == "billing_error":
+                    # Billing/quota error from paid key — switch to retrieval
+                    error_msg = "Billing issue — showing relevant passages."
+                    route_type = "retrieval_only_billing"
                 elif event["type"] == "error":
                     error_msg = event.get("text", "Unknown error")
                     yield {
@@ -610,8 +739,6 @@ async def ask(request: Request, body: AskRequest):
                         "data": json.dumps({"error": error_msg}),
                     }
                 elif event["type"] == "rate_limited":
-                    # Router handles retry internally; this only fires
-                    # if the entire chain is exhausted.
                     error_msg = "All models rate-limited"
                     yield {
                         "event": "error",
@@ -628,14 +755,29 @@ async def ask(request: Request, body: AskRequest):
                     "data": json.dumps({"citations": citations}),
                 }
 
-            # Record real token usage from API response (Phase 4)
+            # Record real token usage from API response
             if user_id and input_tokens is not None and output_tokens is not None:
-                total_tokens = (input_tokens or 0) + (output_tokens or 0)
+                total_tokens = (input_tokens or 0) + (output_tokens or 0) + thinking_tokens
                 if total_tokens > 0:
                     try:
                         await record_tokens(user_id, total_tokens)
                     except Exception:
                         pass
+
+            # Compute and record cost
+            if model_used and input_tokens is not None and output_tokens is not None:
+                cost_usd = compute_cost_usd(
+                    model_used,
+                    input_tokens or 0,
+                    output_tokens or 0,
+                    thinking_tokens,
+                )
+                # Deduct from balance if this was a paid-key request
+                if cost_usd > 0 and is_paid:
+                    try:
+                        await deduct_balance(cost_usd)
+                    except Exception as exc:
+                        logger.warning("Failed to deduct balance: %s", exc)
 
             # Cache the answer
             if full_answer and not error_msg:
@@ -647,7 +789,7 @@ async def ask(request: Request, body: AskRequest):
                 except Exception as exc:
                     logger.warning("Failed to cache answer: %s", exc)
 
-            # Emit remaining quota in the done event (Phase 4)
+            # Emit remaining quota in the done event
             quota_data = {}
             if user_id:
                 try:
@@ -655,9 +797,32 @@ async def ask(request: Request, body: AskRequest):
                 except Exception:
                     pass
 
+            # Build done event with enriched data
+            done_data: dict = {}
+            if quota_data:
+                done_data["quota"] = quota_data
+            done_data["units_charged"] = units_charged
+            done_data["detected_detailed"] = is_detailed
+            done_data["thinking_mode"] = actual_thinking_mode
+            if thinking_reason_code:
+                done_data["thinking_reason"] = thinking_reason_code
+            if user_id:
+                try:
+                    remaining = quota_data or await get_remaining(user_id)
+                    done_data["thinking_left_today"] = remaining.get("thinking_left_today", 0)
+                except Exception:
+                    done_data["thinking_left_today"] = 0
+
+            # Thinking hint: suggest thinking mode when applicable
+            if is_detailed and not actual_thinking_mode:
+                if is_paid:
+                    done_data["hint"] = "try_thinking"
+                else:
+                    done_data["hint"] = "upgrade_for_thinking"
+
             yield {
                 "event": "done",
-                "data": json.dumps({"quota": quota_data} if quota_data else {}),
+                "data": json.dumps(done_data),
             }
 
         except Exception as exc:
@@ -670,11 +835,17 @@ async def ask(request: Request, body: AskRequest):
                 ),
             }
 
-            # Refund quota on LLM failure (Phase 4)
+            # Refund quota on LLM failure
             if quota_consumed and user_id:
                 try:
-                    await refund_quota(user_id, requests=1)
+                    await refund_quota(user_id, units=units_charged)
                     quota_consumed = False
+                except Exception:
+                    pass
+            if thinking_credit_consumed and user_id:
+                try:
+                    await refund_thinking_credit(user_id)
+                    thinking_credit_consumed = False
                 except Exception:
                     pass
 
@@ -695,6 +866,10 @@ async def ask(request: Request, body: AskRequest):
                     cache_hit=cache_hit,
                     route_type=route_type,
                     error=error_msg,
+                    cost_usd=cost_usd,
+                    units_charged=units_charged,
+                    thinking_mode=actual_thinking_mode,
+                    detected_detailed=is_detailed,
                 )
             except Exception as exc:
                 logger.warning("Failed to log query: %s", exc)

@@ -1,13 +1,13 @@
 """
-LLM Router — walks the MODEL_CHAIN, picks the first available model,
+LLM Router — walks the model chain, picks the first available model,
 handles prompt budgeting, streaming, failover, and request queuing.
 
-Core routing logic for Phase 3:
-- Checks each model in priority order for availability (cooldown, RPM/TPM/RPD).
-- Shrinks prompts for models with small TPM (Gemma ~16K, Groq ~8K).
-- On 429/5xx: marks cooldown, retries next model immediately.
-- If all models busy: queues the request with exponential backoff,
-  pushing queue-position updates over SSE.  Timeout → retrieval-only fallback.
+Dual-chain routing:
+- Free users use MODEL_CHAIN_FREE with GEMINI_API_KEY_FREE.
+- Paid users use MODEL_CHAIN_PAID with GEMINI_API_KEY_PAID.
+- Thinking mode uses MODEL_PREMIUM_THINKING with GEMINI_API_KEY_PAID,
+  falling back to MODEL_CHAIN_PAID on failure.
+- Paid requests are served before free ones when the queue is busy.
 """
 
 from __future__ import annotations
@@ -17,9 +17,13 @@ import logging
 import time
 from typing import AsyncGenerator
 
-from app.config import settings
+from app.config import RESPONSE_PROFILES, settings
 from app.services.llm_caller import generate_answer, get_provider
-from app.services.model_verifier import get_verified_active_chain, is_model_verified
+from app.services.model_verifier import (
+    get_verified_active_chain,
+    get_verified_chain,
+    is_model_verified,
+)
 from app.services.rate_counter import (
     can_use_model,
     get_model_limits,
@@ -180,6 +184,12 @@ async def route_and_generate(
     history: list[dict] | None,
     detailed: bool,
     is_summary_job: bool = False,
+    is_paid: bool = False,
+    api_key: str = "",
+    thinking_mode: bool = False,
+    thinking_config: dict | None = None,
+    max_output_tokens: int | None = None,
+    profile_chunks: int | None = None,
 ) -> AsyncGenerator[dict, None]:
     """
     Select a model, budget the prompt, and stream the LLM answer.
@@ -190,10 +200,12 @@ async def route_and_generate(
     - ``{"type": "model_selected", "model_id": "...", "provider": "..."}``
     - ``{"type": "queue_position", "position": N, "estimated_seconds": M}``
     - ``{"type": "token", "text": "..."}``
-    - ``{"type": "usage", "input_tokens": N, "output_tokens": M}``
+    - ``{"type": "usage", "input_tokens": N, "output_tokens": M, "thinking_tokens": K}``
     - ``{"type": "error", "text": "..."}``
     - ``{"type": "rate_limited", "status": 429}``
     - ``{"type": "retrieval_fallback", "text": "..."}``
+    - ``{"type": "billing_error", "text": "..."}``
+    - ``{"type": "thinking_fallback", "reason": "..."}``
 
     Args:
         chunks: Retrieved context chunks.
@@ -201,16 +213,79 @@ async def route_and_generate(
         history: Conversation history (list of role/content dicts).
         detailed: If True, use the higher max_output_tokens setting.
         is_summary_job: If True, this request counts against summary quota.
+        is_paid: Whether the user has a paid plan.
+        api_key: The API key to use for Gemini calls.
+        thinking_mode: If True, attempt thinking chain first.
+        thinking_config: Gemini thinking config dict.
+        max_output_tokens: Override max output tokens (from profile).
+        profile_chunks: Override chunk count (from profile).
     """
-    max_out = (
-        settings.max_output_tokens_detailed if detailed
-        else settings.max_output_tokens
-    )
+    # Use profile-based max_output if provided, otherwise use the deprecated settings
+    if max_output_tokens is None:
+        plan_type = "paid" if is_paid else "free"
+        profile = RESPONSE_PROFILES.get((plan_type, detailed), {})
+        max_out = profile.get("max_output", 800)
+    else:
+        max_out = max_output_tokens
+
+    # Trim chunks to profile count if specified
+    if profile_chunks is not None and len(chunks) > profile_chunks:
+        chunks = chunks[:profile_chunks]
+
     estimated_tokens = _estimate_tokens(chunks, history)
-    chain = get_verified_active_chain()
+
+    # ── Thinking mode: try premium chain first ────────────
+    if thinking_mode and thinking_config:
+        thinking_chain = get_verified_chain("thinking")
+        if thinking_chain:
+            # Apply thinking caps: limit input tokens
+            max_input = settings.thinking_max_input_tokens
+            if estimated_tokens > max_input:
+                # Trim chunks to fit within input limit
+                while len(chunks) > 1 and _estimate_tokens(chunks, history) > max_input:
+                    chunks = chunks[:-1]
+
+            # Override max output for thinking mode
+            thinking_max_out = settings.thinking_max_output_tokens
+
+            model_id, _ = await _pick_model(
+                thinking_chain, estimated_tokens, False,
+            )
+            if model_id is not None:
+                # Try streaming from thinking model
+                success = True
+                async for event in _stream_from_model(
+                    model_id, chunks, question, history,
+                    thinking_max_out, estimated_tokens,
+                    api_key=api_key,
+                    thinking_config=thinking_config,
+                ):
+                    if event.get("type") == "__retry__":
+                        success = False
+                        break
+                    if event.get("type") == "billing_error":
+                        # Billing error on paid key — fall back
+                        success = False
+                        yield {"type": "thinking_fallback", "reason": "thinking_busy"}
+                        break
+                    yield event
+
+                if success:
+                    return
+                # Fall through to normal paid chain
+                logger.info("Thinking model failed — falling back to paid chain")
+            else:
+                yield {"type": "thinking_fallback", "reason": "thinking_busy"}
+
+    # ── Normal chain selection ────────────────────────────
+    chain_type = "paid" if is_paid else "free"
+    if is_paid:
+        chain = get_verified_chain("paid")
+    else:
+        chain = get_verified_active_chain()
 
     if not chain:
-        logger.error("No models in verified active chain — serving fallback")
+        logger.error("No models in verified %s chain — serving fallback", chain_type)
         yield {
             "type": "retrieval_fallback",
             "text": build_retrieval_fallback(chunks),
@@ -221,6 +296,8 @@ async def route_and_generate(
     async for event in _attempt_with_failover(
         chain, chunks, question, history, max_out,
         estimated_tokens, is_summary_job,
+        api_key=api_key,
+        is_paid=is_paid,
     ):
         yield event
 
@@ -238,6 +315,8 @@ async def _attempt_with_failover(
     max_out: int,
     estimated_tokens: int,
     is_summary_job: bool,
+    api_key: str = "",
+    is_paid: bool = False,
 ) -> AsyncGenerator[dict, None]:
     """
     Phase 1 — try models in order; on retryable failure, skip and continue.
@@ -257,11 +336,19 @@ async def _attempt_with_failover(
         async for event in _stream_from_model(
             model_id, chunks, question, history,
             max_out, estimated_tokens,
+            api_key=api_key,
         ):
             if event.get("type") == "__retry__":
                 failed_models.add(model_id)
                 should_retry = True
                 break
+            if event.get("type") == "billing_error":
+                # Billing error on paid key — surface as retrieval fallback
+                yield {
+                    "type": "retrieval_fallback",
+                    "text": build_retrieval_fallback(chunks),
+                }
+                return
             yield event
 
         if not should_retry:
@@ -273,6 +360,7 @@ async def _attempt_with_failover(
     async for event in _queue_loop(
         chain, chunks, question, history,
         max_out, estimated_tokens, is_summary_job,
+        api_key=api_key,
     ):
         yield event
 
@@ -284,6 +372,8 @@ async def _stream_from_model(
     history: list[dict] | None,
     max_out: int,
     estimated_tokens: int,
+    api_key: str = "",
+    thinking_config: dict | None = None,
 ) -> AsyncGenerator[dict, None]:
     """
     Budget, record, and stream from a single model.
@@ -307,8 +397,15 @@ async def _stream_from_model(
     # Pre-record the request against rate counters
     await record_model_request(model_id, estimated_tokens)
 
+    call_kwargs: dict = {}
+    if api_key:
+        call_kwargs["api_key"] = api_key
+    if thinking_config:
+        call_kwargs["thinking_config"] = thinking_config
+
     async for event in generate_answer(
         model_id, trimmed_chunks, question, trimmed_history, adj_max,
+        **call_kwargs,
     ):
         etype = event["type"]
 
@@ -321,6 +418,14 @@ async def _stream_from_model(
             )
             await mark_model_cooldown(model_id, status)
             yield {"type": "__retry__"}
+            return
+
+        # ── Billing/quota error from paid key ──
+        if etype == "billing_error":
+            logger.warning(
+                "Model %s → billing error: %s", model_id, event.get("text", "")[:120],
+            )
+            yield event
             return
 
         # ── Error — check if retryable (5xx) ──
@@ -369,6 +474,7 @@ async def _queue_loop(
     max_out: int,
     estimated_tokens: int,
     is_summary_job: bool,
+    api_key: str = "",
 ) -> AsyncGenerator[dict, None]:
     """
     Wait for a model to become available with exponential backoff.
@@ -419,6 +525,7 @@ async def _queue_loop(
             async for event in _stream_from_model(
                 model_id, chunks, question, history,
                 max_out, estimated_tokens,
+                api_key=api_key,
             ):
                 if event.get("type") == "__retry__":
                     success = False

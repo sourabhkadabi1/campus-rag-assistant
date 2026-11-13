@@ -2,7 +2,8 @@
 Log every query to the query_log table for analytics.
 
 Fields: user, model used, provider, input/output tokens (from real API
-usage metadata), latency, cache hit, route type.
+usage metadata), latency, cache hit, route type, cost, units charged,
+thinking mode, detailed detection.
 """
 
 from __future__ import annotations
@@ -29,6 +30,10 @@ async def log_query(
     cache_hit: bool = False,
     route_type: str = "llm",
     error: Optional[str] = None,
+    cost_usd: float = 0.0,
+    units_charged: int = 1,
+    thinking_mode: bool = False,
+    detected_detailed: bool = False,
 ) -> None:
     """
     Insert a query-log entry.  Fire-and-forget — errors are logged
@@ -39,8 +44,9 @@ async def log_query(
             """INSERT INTO query_log
                (id, user_id, session_id, question, answer,
                 model_used, provider, input_tokens, output_tokens,
-                latency_ms, cache_hit, route_type, error)
-               VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)""",
+                latency_ms, cache_hit, route_type, error,
+                cost_usd, units_charged, thinking_mode, detected_detailed)
+               VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)""",
             str(uuid.uuid4()),
             user_id,
             session_id,
@@ -54,6 +60,10 @@ async def log_query(
             cache_hit,
             route_type,
             error[:2000] if error else None,
+            cost_usd,
+            units_charged,
+            thinking_mode,
+            detected_detailed,
         )
     except Exception as exc:
         logger.warning("Failed to log query: %s", exc)

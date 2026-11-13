@@ -1,29 +1,30 @@
 """
 Admin router — document upload, ingestion status, document listing,
-budget guard management (Phase 4).
+budget guard management, margin dashboard, premium toggle, cost tracking.
 """
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 import uuid
 from pathlib import Path
 
-from fastapi import APIRouter, BackgroundTasks, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, BackgroundTasks, File, Form, HTTPException, Request, UploadFile
 
-from app.config import settings
+from app.config import DEFAULT_MODEL_PRICES, settings
 from app.database import execute, fetch, fetchrow, fetchval
 from app.models import (
+    AdminSettingUpdate,
     ChapterSummaryResponse,
     DocType,
     DocumentResponse,
     IngestionStatus,
     IngestionStatusResponse,
+    MarginDashboardResponse,
 )
 from app.services.ingestion import ingest_document
-
-import json
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -456,3 +457,194 @@ async def update_budget_guard_settings(
         updated_by=admin_id,
     )
     return result
+
+
+# ── Premium toggle (immediate effect) ────────────────────────────
+
+
+@router.post("/settings/premium-toggle")
+async def toggle_premium(request: Request, enabled: bool = True):
+    """Toggle PREMIUM_ENABLED on/off, effective immediately."""
+    admin_id = request.headers.get("X-User-Id")
+    await execute(
+        """INSERT INTO admin_settings (key, value, updated_at, updated_by)
+           VALUES ('premium_enabled', $1, NOW(), $2)
+           ON CONFLICT (key) DO UPDATE
+           SET value = $1, updated_at = NOW(), updated_by = $2""",
+        str(enabled).lower(), admin_id,
+    )
+    return {"premium_enabled": enabled}
+
+
+# ── Balance management ───────────────────────────────────────────
+
+
+@router.get("/settings/balance")
+async def get_balance():
+    """Get the current account balance."""
+    from app.services.quota import get_account_balance
+    balance = await get_account_balance()
+    return {"account_balance_usd": balance}
+
+
+@router.post("/settings/balance")
+async def update_balance(request: Request, amount: float):
+    """
+    Set the account balance to the given amount.
+
+    Admin should reconcile this with the real billing page periodically.
+    """
+    admin_id = request.headers.get("X-User-Id")
+    await execute(
+        """INSERT INTO admin_settings (key, value, updated_at, updated_by)
+           VALUES ('account_balance_usd', $1, NOW(), $2)
+           ON CONFLICT (key) DO UPDATE
+           SET value = $1, updated_at = NOW(), updated_by = $2""",
+        str(amount), admin_id,
+    )
+    return {"account_balance_usd": amount}
+
+
+# ── Model pricing admin ─────────────────────────────────────────
+
+
+@router.get("/settings/model-prices")
+async def get_model_prices():
+    """Get current model pricing configuration."""
+    return {"prices": DEFAULT_MODEL_PRICES}
+
+
+@router.post("/settings/model-prices")
+async def update_model_prices(request: Request, prices: dict):
+    """
+    Update model pricing configuration.
+
+    Expects a dict like: {"model_id": {"input": 0.30, "output": 2.50}}
+    Changes are stored in admin_settings and take effect on next restart.
+    """
+    admin_id = request.headers.get("X-User-Id")
+    await execute(
+        """INSERT INTO admin_settings (key, value, updated_at, updated_by)
+           VALUES ('model_prices', $1, NOW(), $2)
+           ON CONFLICT (key) DO UPDATE
+           SET value = $1, updated_at = NOW(), updated_by = $2""",
+        json.dumps(prices), admin_id,
+    )
+    return {"updated": True, "prices": prices}
+
+
+# ── Margin dashboard ────────────────────────────────────────────
+
+
+@router.get("/margin", response_model=MarginDashboardResponse)
+async def margin_dashboard():
+    """
+    Margin dashboard — today's and 7-day spend, remaining balance,
+    estimated days left, premium/thinking spend vs cap, cache hit rate,
+    detailed share, avg cost per profile, margin alert.
+    """
+    from app.services.quota import get_account_balance, get_today_premium_spend
+
+    # Today's spend
+    today_row = await fetchrow(
+        """SELECT COALESCE(SUM(cost_usd), 0) AS total,
+                  COUNT(*) FILTER (WHERE thinking_mode = TRUE) AS thinking_count
+           FROM query_log
+           WHERE created_at >= CURRENT_DATE AND cost_usd > 0"""
+    )
+    today_spend = float(today_row["total"]) if today_row else 0.0
+    thinking_count = today_row["thinking_count"] if today_row else 0
+
+    # 7-day spend
+    seven_day_row = await fetchrow(
+        """SELECT COALESCE(SUM(cost_usd), 0) AS total
+           FROM query_log
+           WHERE created_at >= CURRENT_DATE - INTERVAL '7 days' AND cost_usd > 0"""
+    )
+    seven_day_spend = float(seven_day_row["total"]) if seven_day_row else 0.0
+
+    # Balance
+    balance = await get_account_balance()
+
+    # Estimated days left
+    avg_daily = seven_day_spend / 7 if seven_day_spend > 0 else 0.0
+    est_days = balance / avg_daily if avg_daily > 0 else 999.0
+
+    # Premium spend today
+    premium_spend = await get_today_premium_spend()
+
+    # Cache hit rate (last 7 days)
+    cache_row = await fetchrow(
+        """SELECT COUNT(*) AS total,
+                  COUNT(*) FILTER (WHERE cache_hit = TRUE) AS hits
+           FROM query_log
+           WHERE created_at >= CURRENT_DATE - INTERVAL '7 days'"""
+    )
+    total_queries = cache_row["total"] if cache_row else 0
+    cache_hits = cache_row["hits"] if cache_row else 0
+    cache_hit_rate = (cache_hits / total_queries) if total_queries > 0 else 0.0
+
+    # Detailed share (last 7 days)
+    detail_row = await fetchrow(
+        """SELECT COUNT(*) AS total,
+                  COUNT(*) FILTER (WHERE detected_detailed = TRUE) AS detailed
+           FROM query_log
+           WHERE created_at >= CURRENT_DATE - INTERVAL '7 days'
+             AND route_type = 'llm'"""
+    )
+    detail_total = detail_row["total"] if detail_row else 0
+    detail_count = detail_row["detailed"] if detail_row else 0
+    detailed_share = (detail_count / detail_total) if detail_total > 0 else 0.0
+
+    # Avg cost per profile (free vs paid)
+    profile_rows = await fetch(
+        """SELECT
+             CASE WHEN q.cost_usd = 0 THEN 'free' ELSE 'paid' END AS profile,
+             AVG(q.cost_usd) AS avg_cost
+           FROM query_log q
+           WHERE q.created_at >= CURRENT_DATE - INTERVAL '7 days'
+             AND q.route_type = 'llm'
+           GROUP BY profile"""
+    )
+    avg_cost_per_profile = {r["profile"]: round(float(r["avg_cost"]), 6) for r in profile_rows}
+
+    # Avg cost per paid user per month (from last 30 days)
+    paid_user_row = await fetchrow(
+        """SELECT COALESCE(SUM(cost_usd), 0) AS total_cost,
+                  COUNT(DISTINCT user_id) AS user_count
+           FROM query_log
+           WHERE created_at >= CURRENT_DATE - INTERVAL '30 days'
+             AND cost_usd > 0"""
+    )
+    paid_total = float(paid_user_row["total_cost"]) if paid_user_row else 0.0
+    paid_users = paid_user_row["user_count"] if paid_user_row else 0
+    avg_cost_per_paid = (paid_total / max(1, paid_users))
+
+    # Plan price in USD (₹99/month ≈ $1.19 at ~₹83/$)
+    plan_price_usd = 9900 / 83 / 100  # rough conversion
+
+    # Margin alert: warn if avg cost per paid user > 40% of net plan price
+    margin_alert = avg_cost_per_paid > (plan_price_usd * 0.40)
+    alert_msg = None
+    if margin_alert:
+        alert_msg = (
+            f"Warning: avg cost per paid user (${avg_cost_per_paid:.4f}/month) "
+            f"exceeds 40% of plan price (${plan_price_usd:.2f}/month)"
+        )
+
+    return MarginDashboardResponse(
+        today_spend_usd=round(today_spend, 4),
+        seven_day_spend_usd=round(seven_day_spend, 4),
+        remaining_balance_usd=round(balance, 2),
+        estimated_days_left=round(est_days, 1),
+        premium_spend_today_usd=round(premium_spend, 4),
+        premium_daily_cap_usd=settings.premium_daily_spend_cap_usd,
+        thinking_requests_today=thinking_count,
+        cache_hit_rate=round(cache_hit_rate, 4),
+        detailed_share=round(detailed_share, 4),
+        avg_cost_per_profile=avg_cost_per_profile,
+        avg_cost_per_paid_user_month=round(avg_cost_per_paid, 4),
+        plan_price_monthly_usd=round(plan_price_usd, 2),
+        margin_alert=margin_alert,
+        margin_alert_message=alert_msg,
+    )

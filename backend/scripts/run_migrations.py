@@ -53,7 +53,7 @@ async def run(dry_run: bool = False) -> None:
 
     import asyncpg
 
-    conn = await asyncpg.connect(dsn=settings.database_url)
+    conn = await asyncpg.connect(dsn=settings.database_url, statement_cache_size=0)
     try:
         for f in sql_files:
             sql = f.read_text()

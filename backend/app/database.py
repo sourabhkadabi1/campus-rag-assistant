@@ -35,6 +35,7 @@ async def init_db() -> asyncpg.Pool:
         min_size=2,
         max_size=10,
         command_timeout=60,
+        statement_cache_size=0,
     )
 
     # Ensure pgvector extension is available

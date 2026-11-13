@@ -172,10 +172,13 @@ class QuotaRemainingResponse(BaseModel):
     tokens_limit: int
     requests_used: int
     tokens_used: int
+    units_used: int = 0
+    units_remaining: int = 0
     cache_hits_today: int = 0
     plan_name: str = "free"
     is_retrieval_only: bool = False
     resets_at: Optional[str] = None  # ISO 8601
+    thinking_left_today: int = 0
 
 
 class UsageResponse(BaseModel):
@@ -241,3 +244,35 @@ class BudgetGuardStatus(BaseModel):
     free_users_affected: bool
     monthly_spend_usd: float = 0.0
     monthly_cap_usd: float = 0.0
+
+
+# ── Redesign: thinking mode, cost tracking, margin dashboard ─────
+
+
+class ThinkingConditionResult(BaseModel):
+    """Result of checking thinking-mode eligibility."""
+    ok: bool
+    reason: str = "ok"  # ok, premium_disabled, not_paid, daily_limit_reached, balance_low
+
+
+class MarginDashboardResponse(BaseModel):
+    """Admin-only margin dashboard data."""
+    today_spend_usd: float = 0.0
+    seven_day_spend_usd: float = 0.0
+    remaining_balance_usd: float = 0.0
+    estimated_days_left: float = 0.0
+    premium_spend_today_usd: float = 0.0
+    premium_daily_cap_usd: float = 0.0
+    thinking_requests_today: int = 0
+    cache_hit_rate: float = 0.0
+    detailed_share: float = 0.0
+    avg_cost_per_profile: dict = Field(default_factory=dict)
+    avg_cost_per_paid_user_month: float = 0.0
+    plan_price_monthly_usd: float = 0.0
+    margin_alert: bool = False
+    margin_alert_message: Optional[str] = None
+
+
+class AdminSettingUpdate(BaseModel):
+    """Admin request to update a setting."""
+    value: str = Field(..., min_length=1)

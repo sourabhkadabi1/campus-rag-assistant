@@ -5,6 +5,9 @@ Exactly ONE LLM call per uncached question.
 One short shared system prompt for ALL models.
 If a model handles system prompts poorly (Gemma), the system text is
 prepended to the user message instead.
+
+Supports dual API keys (free/paid) via the `api_key` parameter
+and Gemini thinking mode via `thinking_config`.
 """
 
 from __future__ import annotations
@@ -109,16 +112,29 @@ async def _stream_gemini(
     model: str,
     messages: list[dict],
     max_output_tokens: int = 800,
+    api_key: str = "",
+    thinking_config: dict | None = None,
 ) -> AsyncGenerator[dict, None]:
     """
     Stream from Gemini ``streamGenerateContent`` endpoint.
 
+    Args:
+        model: Gemini model ID.
+        messages: Conversation messages in generic format.
+        max_output_tokens: Maximum output tokens.
+        api_key: The Gemini API key to use (free or paid).
+        thinking_config: Optional dict with ``thinkingBudget`` for
+            Gemini thinking mode.  When set, adds
+            ``generationConfig.thinkingConfig`` to the request.
+
     Yields dicts:
       ``{"type": "token", "text": "..."}``
-      ``{"type": "usage", "input_tokens": N, "output_tokens": M}``
+      ``{"type": "usage", "input_tokens": N, "output_tokens": M, "thinking_tokens": K}``
       ``{"type": "error", ...}``  /  ``{"type": "rate_limited", ...}``
+      ``{"type": "billing_error", ...}``
     """
-    if not settings.gemini_api_key:
+    key = api_key or settings.gemini_api_key_free
+    if not key:
         yield {"type": "error", "text": "GEMINI_API_KEY not configured"}
         return
 
@@ -143,12 +159,18 @@ async def _stream_gemini(
                 {"role": "model", "parts": [{"text": msg["content"]}]}
             )
 
+    gen_config: dict = {
+        "maxOutputTokens": max_output_tokens,
+        "temperature": 0.3,
+    }
+
+    # Inject thinking configuration when requested
+    if thinking_config:
+        gen_config["thinkingConfig"] = thinking_config
+
     payload: dict = {
         "contents": contents,
-        "generationConfig": {
-            "maxOutputTokens": max_output_tokens,
-            "temperature": 0.3,
-        },
+        "generationConfig": gen_config,
     }
     if system_instruction:
         payload["systemInstruction"] = system_instruction
@@ -160,11 +182,20 @@ async def _stream_gemini(
             "POST",
             url,
             json=payload,
-            params={"key": settings.gemini_api_key, "alt": "sse"},
+            params={"key": key, "alt": "sse"},
             headers={"Content-Type": "application/json"},
         ) as resp:
             if resp.status_code == 429:
                 yield {"type": "rate_limited", "status": 429}
+                return
+            if resp.status_code == 403:
+                body = await resp.aread()
+                body_str = body.decode()[:300]
+                # Check for billing/quota errors from paid key
+                if "billing" in body_str.lower() or "quota" in body_str.lower():
+                    yield {"type": "billing_error", "text": f"Gemini 403: {body_str}"}
+                    return
+                yield {"type": "error", "text": f"Gemini 403: {body_str}"}
                 return
             if resp.status_code >= 400:
                 body = await resp.aread()
@@ -175,6 +206,7 @@ async def _stream_gemini(
                 }
                 return
 
+            thinking_tokens = 0
             async for line in resp.aiter_lines():
                 if not line.startswith("data: "):
                     continue
@@ -185,11 +217,18 @@ async def _stream_gemini(
                     chunk = json.loads(data)
                     for cand in chunk.get("candidates", []):
                         for part in cand.get("content", {}).get("parts", []):
+                            # Skip thought parts (thinking mode) — only yield answer text
+                            if part.get("thought"):
+                                continue
                             if "text" in part:
                                 yield {"type": "token", "text": part["text"]}
 
                     usage = chunk.get("usageMetadata")
                     if usage:
+                        # Gemini reports thoughtsTokenCount for thinking mode
+                        t_tokens = usage.get("thoughtsTokenCount", 0)
+                        if t_tokens:
+                            thinking_tokens = t_tokens
                         yield {
                             "type": "usage",
                             "input_tokens": usage.get(
@@ -198,6 +237,7 @@ async def _stream_gemini(
                             "output_tokens": usage.get(
                                 "candidatesTokenCount", 0
                             ),
+                            "thinking_tokens": thinking_tokens,
                         }
                 except json.JSONDecodeError:
                     continue
@@ -282,6 +322,7 @@ async def _stream_groq(
                             "output_tokens": usage.get(
                                 "completion_tokens", 0
                             ),
+                            "thinking_tokens": 0,
                         }
                 except json.JSONDecodeError:
                     continue
@@ -298,15 +339,27 @@ async def generate_answer(
     question: str,
     history: list[dict] | None = None,
     max_output_tokens: int = 800,
+    api_key: str = "",
+    thinking_config: dict | None = None,
 ) -> AsyncGenerator[dict, None]:
     """
     Generate a streaming answer using the specified model.
+
+    Args:
+        model_id: The model to call.
+        chunks: Retrieved context chunks.
+        question: Student question.
+        history: Conversation history.
+        max_output_tokens: Max output tokens for this request.
+        api_key: API key to use (router passes free or paid key).
+        thinking_config: Thinking mode config for Gemini models.
 
     Yields dicts:
       ``{"type": "token", "text": "..."}``   — incremental text
       ``{"type": "usage", ...}``             — token counts (final chunk)
       ``{"type": "error", "text": "..."}``   — error
       ``{"type": "rate_limited", ...}``      — 429
+      ``{"type": "billing_error", ...}``     — billing/quota error
     """
     messages = build_messages(question, chunks, history, model_id)
     provider = get_provider(model_id)
@@ -316,6 +369,8 @@ async def generate_answer(
             yield event
     else:
         async for event in _stream_gemini(
-            model_id, messages, max_output_tokens
+            model_id, messages, max_output_tokens,
+            api_key=api_key,
+            thinking_config=thinking_config,
         ):
             yield event

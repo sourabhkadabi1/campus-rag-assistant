@@ -2,14 +2,16 @@
 Quota enforcement service — atomic consume / refund / remaining / budget guard.
 
 Key semantics:
-  - Quota check is ATOMIC: a single SQL ``UPDATE … WHERE requests_used < limit RETURNING``
-    (or Redis INCR with expiry) guarantees concurrent requests cannot exceed the limit.
+  - Quota check is ATOMIC: a single SQL ``UPDATE … WHERE units_used < limit RETURNING``
+    guarantees concurrent requests cannot exceed the limit.
   - Cache hits and stored-summary routes do NOT consume quota.
-  - If the LLM call fails, the consumed request is refunded.
+  - If the LLM call fails, the consumed units are refunded.
   - Token usage is updated AFTER the LLM call with real API-reported counts.
   - A student may slightly overshoot on their last question (tokens only).
   - When the global budget guard fires (~90 % combined free-tier capacity),
     FREE users auto-switch to retrieval-only while PAID users keep full answers.
+  - Balance guard: if account balance < PAID_MIN_BALANCE_USD, paid users
+    also get retrieval-only answers.
 """
 
 from __future__ import annotations
@@ -19,10 +21,21 @@ import logging
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
-from app.config import DEFAULT_MODEL_LIMITS, settings
+from app.config import DEFAULT_MODEL_LIMITS, DEFAULT_MODEL_PRICES, settings
 from app.database import execute, fetch, fetchrow, fetchval
 
 logger = logging.getLogger(__name__)
+
+
+def _row_val(row, key: str, default=None):
+    """Safely extract a key from a DB Record or dict mock."""
+    if not row:
+        return default
+    try:
+        val = row[key]
+        return val if val is not None else default
+    except (KeyError, IndexError, TypeError):
+        return default
 
 
 # ╔════════════════════════════════════════════════════════════════╗
@@ -35,14 +48,16 @@ async def get_user_plan(user_id: str) -> dict:
     Return the active plan limits for *user_id*.
 
     Returns a dict with keys:
-      plan_name, requests_per_day, tokens_per_day, features, is_paid
+      plan_name, requests_per_day, tokens_per_day, features, is_paid,
+      thinking_credits_per_day
     Falls back to the default (free) plan when:
       - The user has no plan set.
       - The plan has expired.
     """
     row = await fetchrow(
         """SELECT p.name AS plan_name, p.requests_per_day, p.tokens_per_day,
-                  p.features, pr.plan_expires_at
+                  p.features, pr.plan_expires_at,
+                  COALESCE(p.thinking_credits_per_day, 0) AS thinking_credits_per_day
            FROM profiles pr
            LEFT JOIN plans p ON pr.plan_id = p.id
            WHERE pr.id = $1""",
@@ -55,30 +70,31 @@ async def get_user_plan(user_id: str) -> dict:
         "tokens_per_day": 40_000,
         "features": {},
         "is_paid": False,
+        "thinking_credits_per_day": 0,
     }
 
     if not row:
         return free_defaults
 
     # Check plan expiry
-    expires = row["plan_expires_at"]
+    expires = _row_val(row, "plan_expires_at")
     if expires and expires < datetime.now(timezone.utc):
-        # Plan expired — reset to free
         logger.info("Plan expired for user %s — reverting to free", user_id)
         await _reset_to_free(user_id)
         return free_defaults
 
-    plan_name = row["plan_name"] or "free"
-    features = row["features"]
+    plan_name = _row_val(row, "plan_name") or "free"
+    features = _row_val(row, "features")
     if isinstance(features, str):
         features = json.loads(features)
 
     return {
         "plan_name": plan_name,
-        "requests_per_day": row["requests_per_day"] or 10,
-        "tokens_per_day": row["tokens_per_day"] or 40_000,
+        "requests_per_day": _row_val(row, "requests_per_day", 10) or 10,
+        "tokens_per_day": _row_val(row, "tokens_per_day", 40_000) or 40_000,
         "features": features or {},
         "is_paid": plan_name != "free",
+        "thinking_credits_per_day": _row_val(row, "thinking_credits_per_day", 0),
     }
 
 
@@ -105,12 +121,13 @@ async def consume_quota(
     user_id: str,
     requests_limit: int,
     tokens_limit: int,
+    units: int = 1,
 ) -> tuple[bool, dict]:
     """
-    Atomically consume 1 request from the user's daily quota.
+    Atomically consume *units* from the user's daily quota.
 
     Returns ``(ok, usage_dict)`` where *ok* is False when the user has
-    exceeded either the request or token limit.
+    exceeded either the unit or token limit.
 
     The token check allows slight overshoot on the last question — tokens are
     only updated after the LLM call via :func:`record_tokens`.  Here we only
@@ -118,68 +135,87 @@ async def consume_quota(
     """
     # Ensure a row exists for today
     await execute(
-        """INSERT INTO usage_daily (user_id, date, requests_used, tokens_used, cache_hits)
-           VALUES ($1, CURRENT_DATE, 0, 0, 0)
+        """INSERT INTO usage_daily (user_id, date, requests_used, tokens_used, cache_hits, units_used, thinking_credits_used)
+           VALUES ($1, CURRENT_DATE, 0, 0, 0, 0, 0)
            ON CONFLICT (user_id, date) DO NOTHING""",
         user_id,
     )
 
     # Atomic increment with guard — single statement, race-safe
+    # Check against units_used (the new currency) but also increment requests_used for backward compat
     row = await fetchrow(
         """UPDATE usage_daily
-           SET requests_used = requests_used + 1
+           SET requests_used = requests_used + 1,
+               units_used = units_used + $3
            WHERE user_id = $1 AND date = CURRENT_DATE
-             AND requests_used < $2
-           RETURNING requests_used, tokens_used, cache_hits""",
-        user_id, requests_limit,
+             AND units_used + $3 <= $2
+           RETURNING requests_used, tokens_used, cache_hits, units_used""",
+        user_id, requests_limit, units,
     )
 
     if not row:
-        # Quota exceeded (requests)
+        # Quota exceeded (units)
         usage = await fetchrow(
-            """SELECT requests_used, tokens_used, cache_hits
+            """SELECT requests_used, tokens_used, cache_hits, units_used
                FROM usage_daily WHERE user_id = $1 AND date = CURRENT_DATE""",
             user_id,
         )
+        req_used = _row_val(usage, "requests_used", requests_limit)
         return False, {
-            "requests_used": usage["requests_used"] if usage else requests_limit,
-            "tokens_used": usage["tokens_used"] if usage else 0,
-            "cache_hits": usage["cache_hits"] if usage else 0,
+            "requests_used": req_used,
+            "tokens_used": _row_val(usage, "tokens_used", 0),
+            "cache_hits": _row_val(usage, "cache_hits", 0),
+            "units_used": _row_val(usage, "units_used", req_used),
             "reason": "requests_exceeded",
         }
 
+    tok_used = _row_val(row, "tokens_used", 0)
+    req_used = _row_val(row, "requests_used", 1)
+    un_used = _row_val(row, "units_used", req_used)
+    c_hits = _row_val(row, "cache_hits", 0)
+
     # Check token limit (block if already at limit; allow overshoot on last Q)
-    if row["tokens_used"] >= tokens_limit:
-        # Refund the request we just consumed
-        await refund_quota(user_id, requests=1)
+    if tok_used >= tokens_limit:
+        # Refund the units we just consumed
+        await refund_quota(user_id, units=units)
         return False, {
-            "requests_used": row["requests_used"] - 1,
-            "tokens_used": row["tokens_used"],
-            "cache_hits": row["cache_hits"],
+            "requests_used": req_used - 1,
+            "tokens_used": tok_used,
+            "cache_hits": c_hits,
+            "units_used": max(0, un_used - units),
             "reason": "tokens_exceeded",
         }
 
     return True, {
-        "requests_used": row["requests_used"],
-        "tokens_used": row["tokens_used"],
-        "cache_hits": row["cache_hits"],
+        "requests_used": req_used,
+        "tokens_used": tok_used,
+        "cache_hits": c_hits,
+        "units_used": un_used,
     }
 
 
-async def refund_quota(user_id: str, requests: int = 1, tokens: int = 0) -> None:
+async def refund_quota(
+    user_id: str,
+    requests: int = 1,
+    tokens: int = 0,
+    units: int | None = None,
+) -> None:
     """
     Refund quota after an LLM call failure.
 
     Decrements the counters but clamps at 0 to avoid negatives.
+    Supports both requests=... and units=... parameter names.
     """
+    actual_units = units if units is not None else requests
     await execute(
         """UPDATE usage_daily
            SET requests_used = GREATEST(0, requests_used - $2),
-               tokens_used   = GREATEST(0, tokens_used - $3)
+               units_used    = GREATEST(0, units_used - $3),
+               tokens_used   = GREATEST(0, tokens_used - $4)
            WHERE user_id = $1 AND date = CURRENT_DATE""",
-        user_id, requests, tokens,
+        user_id, requests, actual_units, tokens,
     )
-    logger.debug("Refunded quota for %s: -%d requests, -%d tokens", user_id, requests, tokens)
+    logger.debug("Refunded quota for %s: -%d requests, -%d units, -%d tokens", user_id, requests, actual_units, tokens)
 
 
 async def record_tokens(user_id: str, tokens: int) -> None:
@@ -201,12 +237,206 @@ async def record_tokens(user_id: str, tokens: int) -> None:
 async def record_cache_hit(user_id: str) -> None:
     """Increment the cache-hits counter (no quota consumed)."""
     await execute(
-        """INSERT INTO usage_daily (user_id, date, requests_used, tokens_used, cache_hits)
-           VALUES ($1, CURRENT_DATE, 0, 0, 1)
+        """INSERT INTO usage_daily (user_id, date, requests_used, tokens_used, cache_hits, units_used, thinking_credits_used)
+           VALUES ($1, CURRENT_DATE, 0, 0, 1, 0, 0)
            ON CONFLICT (user_id, date) DO UPDATE
            SET cache_hits = usage_daily.cache_hits + 1""",
         user_id,
     )
+
+
+# ╔════════════════════════════════════════════════════════════════╗
+# ║  Thinking credits                                             ║
+# ╚════════════════════════════════════════════════════════════════╝
+
+
+async def consume_thinking_credit(user_id: str, daily_limit: int) -> tuple[bool, int]:
+    """
+    Atomically consume one thinking credit for today.
+
+    Returns ``(ok, credits_used_after)``; ok=False when limit reached.
+    """
+    # Ensure row exists
+    await execute(
+        """INSERT INTO usage_daily (user_id, date, requests_used, tokens_used, cache_hits, units_used, thinking_credits_used)
+           VALUES ($1, CURRENT_DATE, 0, 0, 0, 0, 0)
+           ON CONFLICT (user_id, date) DO NOTHING""",
+        user_id,
+    )
+
+    row = await fetchrow(
+        """UPDATE usage_daily
+           SET thinking_credits_used = thinking_credits_used + 1
+           WHERE user_id = $1 AND date = CURRENT_DATE
+             AND thinking_credits_used < $2
+           RETURNING thinking_credits_used""",
+        user_id, daily_limit,
+    )
+    if not row:
+        return False, daily_limit
+    return True, row["thinking_credits_used"]
+
+
+async def refund_thinking_credit(user_id: str) -> None:
+    """Refund one thinking credit on failure."""
+    await execute(
+        """UPDATE usage_daily
+           SET thinking_credits_used = GREATEST(0, thinking_credits_used - 1)
+           WHERE user_id = $1 AND date = CURRENT_DATE""",
+        user_id,
+    )
+
+
+async def get_thinking_left_today(user_id: str, daily_limit: int) -> int:
+    """Return the number of thinking credits remaining today."""
+    row = await fetchrow(
+        """SELECT thinking_credits_used FROM usage_daily
+           WHERE user_id = $1 AND date = CURRENT_DATE""",
+        user_id,
+    )
+    used = row["thinking_credits_used"] if row else 0
+    return max(0, daily_limit - used)
+
+
+# ╔════════════════════════════════════════════════════════════════╗
+# ║  Cost tracking                                                ║
+# ╚════════════════════════════════════════════════════════════════╝
+
+
+def compute_cost_usd(
+    model_id: str,
+    input_tokens: int,
+    output_tokens: int,
+    thinking_tokens: int = 0,
+) -> float:
+    """
+    Compute the cost in USD for a request based on model pricing.
+
+    Thinking tokens count as output tokens for pricing purposes.
+    Free-key models, Gemma, and Groq models cost 0.
+    """
+    prices = DEFAULT_MODEL_PRICES.get(model_id)
+    if not prices:
+        return 0.0
+
+    input_price = prices.get("input", 0.0)
+    output_price = prices.get("output", 0.0)
+
+    if input_price == 0 and output_price == 0:
+        return 0.0
+
+    # USD per 1M tokens → USD per token
+    cost = (input_tokens * input_price / 1_000_000) + \
+           ((output_tokens + thinking_tokens) * output_price / 1_000_000)
+
+    return round(cost, 6)
+
+
+async def get_account_balance() -> float:
+    """Get the current account balance from admin_settings table."""
+    row = await fetchrow(
+        "SELECT value FROM admin_settings WHERE key = 'account_balance_usd'"
+    )
+    if row:
+        try:
+            return float(row["value"])
+        except (ValueError, TypeError):
+            pass
+    return settings.account_balance_usd
+
+
+async def deduct_balance(cost_usd: float) -> float:
+    """
+    Subtract cost_usd from the account balance.
+
+    Returns the new balance.
+    """
+    if cost_usd <= 0:
+        return await get_account_balance()
+
+    # Atomic decrement
+    row = await fetchrow(
+        """UPDATE admin_settings
+           SET value = (CAST(value AS DECIMAL) - $1)::TEXT,
+               updated_at = NOW()
+           WHERE key = 'account_balance_usd'
+           RETURNING value""",
+        cost_usd,
+    )
+    if row:
+        try:
+            return float(row["value"])
+        except (ValueError, TypeError):
+            pass
+    return 0.0
+
+
+async def get_today_premium_spend() -> float:
+    """Get total cost_usd spent today on paid-key (thinking) requests."""
+    row = await fetchrow(
+        """SELECT COALESCE(SUM(cost_usd), 0) AS total
+           FROM query_log
+           WHERE thinking_mode = TRUE
+             AND created_at >= CURRENT_DATE
+             AND cost_usd > 0"""
+    )
+    return float(row["total"]) if row else 0.0
+
+
+async def is_premium_enabled() -> bool:
+    """Check the PREMIUM_ENABLED admin toggle."""
+    row = await fetchrow(
+        "SELECT value FROM admin_settings WHERE key = 'premium_enabled'"
+    )
+    if row:
+        return row["value"].lower() in ("true", "1", "yes")
+    return settings.premium_enabled
+
+
+async def check_thinking_conditions(
+    user_id: str,
+    plan_info: dict,
+) -> tuple[bool, str]:
+    """
+    Check ALL conditions for thinking mode.  Returns ``(ok, reason_code)``.
+
+    Conditions:
+      1. PREMIUM_ENABLED is true
+      2. User is paid with an active plan
+      3. User has thinking credits left today
+      4. Today's premium spend is under PREMIUM_DAILY_SPEND_CAP_USD
+      5. ACCOUNT_BALANCE_USD is above PREMIUM_MIN_BALANCE_USD
+    """
+    # 1. Premium enabled
+    if not await is_premium_enabled():
+        return False, "premium_disabled"
+
+    # 2. User must be paid
+    if not plan_info.get("is_paid"):
+        return False, "not_paid"
+
+    # 3. Thinking credits left
+    daily_limit = plan_info.get("thinking_credits_per_day", 0) or settings.thinking_daily_per_user
+    left = await get_thinking_left_today(user_id, daily_limit)
+    if left <= 0:
+        return False, "daily_limit_reached"
+
+    # 4. Daily premium spend cap
+    spend = await get_today_premium_spend()
+    if spend >= settings.premium_daily_spend_cap_usd:
+        return False, "daily_limit_reached"
+
+    # 5. Balance check
+    balance = await get_account_balance()
+    if balance < settings.premium_min_balance_usd:
+        return False, "balance_low"
+
+    return True, "ok"
+
+
+# ╔════════════════════════════════════════════════════════════════╗
+# ║  Remaining quota                                              ║
+# ╚════════════════════════════════════════════════════════════════╝
 
 
 async def get_remaining(user_id: str) -> dict:
@@ -214,22 +444,26 @@ async def get_remaining(user_id: str) -> dict:
     Return the remaining quota for the current day.
 
     Dict keys: requests_remaining, tokens_remaining, requests_limit,
-    tokens_limit, requests_used, tokens_used, cache_hits_today,
-    plan_name, is_retrieval_only, resets_at.
+    tokens_limit, requests_used, tokens_used, units_used, units_remaining,
+    cache_hits_today, plan_name, is_retrieval_only, resets_at,
+    thinking_left_today.
     """
     plan = await get_user_plan(user_id)
     usage = await fetchrow(
-        """SELECT requests_used, tokens_used, cache_hits
+        """SELECT requests_used, tokens_used, cache_hits, units_used, thinking_credits_used
            FROM usage_daily WHERE user_id = $1 AND date = CURRENT_DATE""",
         user_id,
     )
 
-    requests_used = usage["requests_used"] if usage else 0
-    tokens_used = usage["tokens_used"] if usage else 0
-    cache_hits = usage["cache_hits"] if usage else 0
+    requests_used = _row_val(usage, "requests_used", 0)
+    tokens_used = _row_val(usage, "tokens_used", 0)
+    cache_hits = _row_val(usage, "cache_hits", 0)
+    units_used = _row_val(usage, "units_used", requests_used)
+    thinking_credits_used = _row_val(usage, "thinking_credits_used", 0)
 
     req_limit = plan["requests_per_day"]
     tok_limit = plan["tokens_per_day"]
+    thinking_daily = plan.get("thinking_credits_per_day", 0) or 0
 
     # Budget guard check
     retrieval_only = await should_use_retrieval_only(plan["is_paid"])
@@ -239,16 +473,19 @@ async def get_remaining(user_id: str) -> dict:
     tomorrow = (now + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
 
     return {
-        "requests_remaining": max(0, req_limit - requests_used),
+        "requests_remaining": max(0, req_limit - units_used),
         "tokens_remaining": max(0, tok_limit - tokens_used),
         "requests_limit": req_limit,
         "tokens_limit": tok_limit,
         "requests_used": requests_used,
         "tokens_used": tokens_used,
+        "units_used": units_used,
+        "units_remaining": max(0, req_limit - units_used),
         "cache_hits_today": cache_hits,
         "plan_name": plan["plan_name"],
         "is_retrieval_only": retrieval_only,
         "resets_at": tomorrow.isoformat(),
+        "thinking_left_today": max(0, thinking_daily - thinking_credits_used),
     }
 
 
@@ -282,7 +519,7 @@ async def get_capacity_used_pct() -> float:
     """
     Calculate what percentage of combined free-provider daily capacity is used.
 
-    Uses the rate counter data for today across all MODEL_CHAIN models.
+    Uses the rate counter data for today across all free chain models.
     """
     from app.services.rate_counter import get_current_date_str, get_rate_store
 
@@ -292,7 +529,8 @@ async def get_capacity_used_pct() -> float:
     total_rpd_limit = 0
     total_rpd_used = 0
 
-    for model_id in settings.model_chain_list:
+    # Use free chain for capacity calculation (matches budget guard semantics)
+    for model_id in settings.model_chain_free_list:
         limits = DEFAULT_MODEL_LIMITS.get(model_id, {})
         rpd_limit = limits.get("rpd", 100)
         total_rpd_limit += rpd_limit
@@ -312,9 +550,21 @@ async def should_use_retrieval_only(is_paid: bool) -> bool:
     Returns True when:
       - Admin has manually toggled "exam-week mode" (manual_retrieval_only), OR
       - Budget guard is enabled AND capacity exceeds threshold AND user is FREE.
-    Paid users are never affected by the automatic budget guard.
+      - Balance guard: paid users switch to retrieval-only when balance
+        < PAID_MIN_BALANCE_USD.
     """
+    # Balance guard for paid users
     if is_paid:
+        try:
+            balance = await get_account_balance()
+            if balance < settings.paid_min_balance_usd:
+                logger.warning(
+                    "Balance guard triggered: $%.2f < $%.2f — PAID users → retrieval-only",
+                    balance, settings.paid_min_balance_usd,
+                )
+                return True
+        except Exception:
+            pass
         return False
 
     try:

@@ -3,9 +3,12 @@ Model verification service — verifies model IDs against provider APIs.
 
 At backend startup:
 - Fetches available model IDs from Gemini and Groq APIs.
-- Compares MODEL_CHAIN, SUMMARY_MODEL, and SUMMARY_FALLBACK against the lists.
+- Compares MODEL_CHAIN_FREE, MODEL_CHAIN_PAID, MODEL_PREMIUM_THINKING,
+  SUMMARY_MODEL, and SUMMARY_FALLBACK against the lists.
+- Uses GEMINI_API_KEY_FREE for free chain models and GEMINI_API_KEY_PAID
+  for paid/thinking chain models.
 - For missing IDs: logs a clear error, suggests the closest match, and excludes
-  the model from the active student chain so it is never called.
+  the model from the active chain so it is never called.
 - Maintains in-memory registry of verification statuses for admin inspection.
 """
 
@@ -56,7 +59,7 @@ def clean_model_id(model_id: str) -> str:
 
 async def fetch_gemini_model_ids(api_key: Optional[str] = None) -> list[str]:
     """Fetch model IDs from Gemini list models endpoint."""
-    key = api_key or settings.gemini_api_key
+    key = api_key or settings.gemini_api_key_free
     if not key:
         logger.warning("[ModelVerifier] GEMINI_API_KEY not configured — skipping Gemini discovery")
         return []
@@ -112,7 +115,6 @@ def find_closest_match(target: str, candidates: list[str]) -> Optional[str]:
     # 2. Substring / prefix matches
     substring_matches = [c for c in candidates if target.lower() in c.lower() or c.lower() in target.lower()]
     if substring_matches:
-        # Return shortest or most specific
         return substring_matches[0]
 
     # 3. Fuzzy matching using difflib
@@ -125,23 +127,36 @@ async def verify_configured_models(
     groq_ids: Optional[list[str]] = None,
 ) -> dict[str, ModelVerificationStatus]:
     """
-    Verify all models configured in MODEL_CHAIN, SUMMARY_MODEL, and SUMMARY_FALLBACK.
+    Verify all models configured in MODEL_CHAIN_FREE, MODEL_CHAIN_PAID,
+    MODEL_PREMIUM_THINKING, SUMMARY_MODEL, and SUMMARY_FALLBACK.
 
+    Uses GEMINI_API_KEY_FREE for free chain Gemini models and
+    GEMINI_API_KEY_PAID for paid/thinking chain Gemini models.
     Excludes unverified models from active routing so they are never called.
     """
     global _CACHED_GEMINI_MODELS, _CACHED_GROQ_MODELS, _MODEL_REGISTRY
 
+    # Fetch model lists using both keys if available
     if gemini_ids is None:
-        gemini_ids = await fetch_gemini_model_ids()
+        # Try both keys — merge the results
+        free_ids = await fetch_gemini_model_ids(settings.gemini_api_key_free)
+        paid_ids = await fetch_gemini_model_ids(settings.gemini_api_key_paid)
+        gemini_ids = sorted(set(free_ids) | set(paid_ids))
     if groq_ids is None:
         groq_ids = await fetch_groq_model_ids()
 
     _CACHED_GEMINI_MODELS = gemini_ids
     _CACHED_GROQ_MODELS = groq_ids
 
-    # Collect all configured model names to check
+    # Collect all configured model names to check, grouped by chain
     configured_models: list[str] = []
-    for m in settings.model_chain_list:
+    for m in settings.model_chain_free_list:
+        if m not in configured_models:
+            configured_models.append(m)
+    for m in settings.model_chain_paid_list:
+        if m not in configured_models:
+            configured_models.append(m)
+    for m in settings.model_premium_thinking_list:
         if m not in configured_models:
             configured_models.append(m)
 
@@ -152,9 +167,6 @@ async def verify_configured_models(
     results: dict[str, ModelVerificationStatus] = {}
     now = datetime.now(timezone.utc)
 
-    # Note: If no API keys are set at all (e.g. offline dev or unit test),
-    # we don't automatically mark everything as invalid if both ID lists are empty,
-    # but we record that the API could not be reached.
     gemini_available = bool(gemini_ids)
     groq_available = bool(groq_ids)
 
@@ -180,14 +192,13 @@ async def verify_configured_models(
             )
             logger.info("✓ Model verified: %s (%s)", model_id, provider)
         elif has_api:
-            # We reached the API, but model was not in list
             suggestion = find_closest_match(bare_id, candidates)
             sugg_str = f"groq:{suggestion}" if (provider == "groq" and suggestion) else suggestion
             error_msg = f"Model '{model_id}' not found in {provider} model list."
             if suggestion:
                 error_msg += f" Closest match: '{sugg_str}'."
             logger.error(
-                "✗ [ModelVerifier] %s Excluded from active student chain.",
+                "✗ [ModelVerifier] %s Excluded from active chain.",
                 error_msg,
             )
             status = ModelVerificationStatus(
@@ -199,12 +210,8 @@ async def verify_configured_models(
                 verified_at=now,
             )
         else:
-            # API key not configured or API unreachable; in dev without keys,
-            # we keep status with warning
             error_msg = f"{provider.upper()} API unreachable or key not set; cannot verify '{model_id}'."
             logger.warning("[ModelVerifier] %s", error_msg)
-            # If API was unreachable, we mark unverified if strictly verified is required,
-            # but preserve in registry
             status = ModelVerificationStatus(
                 model_id=model_id,
                 provider=provider,
@@ -230,16 +237,31 @@ def is_model_verified(model_id: str) -> bool:
     return entry.is_verified if entry else False
 
 
-def get_verified_active_chain() -> list[str]:
+def get_verified_chain(chain_type: str = "free") -> list[str]:
     """
-    Get the configured MODEL_CHAIN filtered to only verified models.
+    Get the configured chain filtered to only verified models.
+
+    Args:
+        chain_type: 'free', 'paid', or 'thinking'.
 
     If no models are verified (e.g. offline dev/testing), returns the original chain
     so testing with mock responses can still operate.
     """
-    configured = settings.model_chain_list
+    if chain_type == "paid":
+        configured = settings.model_chain_paid_list
+    elif chain_type == "thinking":
+        configured = settings.model_premium_thinking_list
+    else:
+        configured = settings.model_chain_free_list
+
     verified = [m for m in configured if is_model_verified(m)]
     if not verified and not _CACHED_GEMINI_MODELS and not _CACHED_GROQ_MODELS:
         # No verification was possible (e.g. no internet/keys in local test)
         return configured
     return verified
+
+
+# Keep backward-compatible alias for imports that use the old name
+def get_verified_active_chain() -> list[str]:
+    """Backward-compatible alias — returns the free chain."""
+    return get_verified_chain("free")
