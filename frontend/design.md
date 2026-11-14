@@ -1,35 +1,35 @@
 # Design: PESU Academy
 
-The locked system. Every Hallmark run reads this first and pages share it. Change it on purpose; the file is the rule.
+The shared Hallmark system for the student assistant, pricing, and administration screens.
 
 ## System
-- Genre: editorial
-- Shape of the first page: app screen
-- Theme: Broadside, bill
-- Axes: warm paper / serif display / vermilion signal · posture: committed
-- Shared across chat, pricing, and admin. Marketing composition belongs to each route; the academic paper and ink system stays fixed.
+- Genre: modern-minimal
+- Shape: app screens, preserving the existing route structure and interactions
+- Theme: Console, adapted into light paper and dark graphite modes
+- Axes: calm instrument workspace / amber for person and action / blue for source and instrument
+- Signature: course-grounded answers with nearby citations
 
 ## Tokens
-`src/app/tokens.css` is the source of truth. The roles:
+`src/app/tokens.css` is the source of truth. Light mode is the warm neutral paper palette; dark mode is graphite. The amber and cool blue meanings stay consistent between modes.
 
-```css
-:root {
-  --color-paper: oklch(94% .025 82); --color-paper-2: oklch(89% .032 82); --color-paper-3: oklch(85% .035 82);
-  --color-ink: oklch(19% .012 48); --color-ink-2: oklch(31% .018 52); --color-muted: oklch(42% .02 65); --color-rule: oklch(73% .025 78);
-  --color-accent: oklch(51% .17 32); --color-accent-ink: oklch(97% .02 82); --color-focus: oklch(50% .18 32);
-  --font-display: Georgia, "Times New Roman", serif; --font-body: "Arial Narrow", "Aptos Narrow", Arial, sans-serif;
-  --radius-card: 0; --radius-pill: 0; --rule-hair: 1px; --rule-bar: 4px;
-}
-```
-
-The spacing, type, easing and duration scales also live in `src/app/tokens.css`.
+## Surfaces and shape
+- Ground, raised panel, and inset work surface form three clear levels.
+- Use rounded panels for grouped content, compact rounded controls for actions, and pills only for short filters or status.
+- Tables and chat content stay mostly flat, separated by rules rather than nested cards.
+- No glow, gradient surfaces, or ornamental motion.
 
 ## Controls
-- Primary: ink fill, square corners, 44px minimum target
-- Secondary: paper surface with a rule, same corners and target
+- Primary: amber fill, compact rounded corners, 44px minimum hit target.
+- Secondary: raised paper surface with a quiet rule.
+- Focus is an immediate high-contrast outline.
+
+## Meaning
+- Amber marks a person, current action, or selected state.
+- Cool blue marks citations, source references, or instrument output.
+- Green and red are reserved for success and error states.
 
 ## Motion
-- Character: still; motion communicates state only; reduced motion removes transitions and animation.
+State changes only; reduced motion removes transitions and animation.
 
 ## Exports
-`src/app/tokens.css` and the Tailwind palette in `tailwind.config.ts`.
+`src/app/tokens.css`, the shared styles in `src/app/globals.css`, and the Tailwind palette in `tailwind.config.ts`.

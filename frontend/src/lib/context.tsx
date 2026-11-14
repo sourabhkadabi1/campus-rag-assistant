@@ -58,11 +58,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         setIsDarkMode(dark);
         if (dark) {
           document.documentElement.classList.add("dark");
+          document.documentElement.classList.remove("light");
         } else {
           document.documentElement.classList.remove("dark");
+          document.documentElement.classList.add("light");
         }
       } else {
-        document.documentElement.classList.remove("dark");
+        const dark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+        setIsDarkMode(dark);
+        document.documentElement.classList.toggle("dark", dark);
+        document.documentElement.classList.toggle("light", !dark);
       }
     } catch (e) {
       console.warn("Storage access failed", e);
@@ -84,8 +89,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       } catch {}
       if (next) {
         document.documentElement.classList.add("dark");
+        document.documentElement.classList.remove("light");
       } else {
         document.documentElement.classList.remove("dark");
+        document.documentElement.classList.add("light");
       }
       return next;
     });

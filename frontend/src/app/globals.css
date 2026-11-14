@@ -1,6 +1,5 @@
-/* Hallmark · shape: app screen · genre: editorial · theme: Broadside (deal 2/3, seed pesu-students-studying-from-0312·16f0ee7d·2026-11-14·r0) · redesign: full
- * nav: compact course header · signature: cited answer and source page · states: loading, empty, error, full · broadside: bill */
-/* Hallmark · pre-emit critique: P4 H4 E4 S4 R3 V4 · weakest: R, warm paper and ink rules replace the generic glass dashboard */
+/* Hallmark · shape: app screen · genre: modern-minimal · theme: Console (by request) · redesign: full · scope: app · signature: cited answers grounded in course material · console: light paper and graphite */
+/* Hallmark · pre-emit critique: P4 H4 E4 S4 R3 V4 · weakest: E, replaced warm print surfaces with a calm, dual-mode instrument workspace */
 @import "katex/dist/katex.min.css";
 @import "./tokens.css";
 @import "./base.css" layer(base);
@@ -10,85 +9,118 @@
 @tailwind utilities;
 
 html, body { overflow-x: clip; }
-html { scroll-padding-top: 5rem; scrollbar-color: var(--color-muted) var(--color-paper); }
-body { background: var(--color-paper); color: var(--color-ink); font-family: var(--font-body); font-size: 16px; line-height: 1.55; caret-color: var(--color-accent); }
-::selection { background: var(--color-accent); color: var(--color-accent-ink); }
+html { scroll-padding-top: 5rem; scrollbar-color: var(--color-rule-2) var(--color-paper); }
+body { background: var(--color-paper); color: var(--color-ink); font-family: var(--font-body); font-size: 16px; line-height: 1.55; caret-color: var(--color-accent); transition: background-color var(--dur-short) var(--ease-out), color var(--dur-short) var(--ease-out); }
+::selection { background: color-mix(in oklab, var(--color-accent) 34%, transparent); color: var(--color-ink); }
 :focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
 button, input, select, textarea { font: inherit; }
-h1, h2, h3, h4 { color: var(--color-ink); font-family: var(--font-display-2); font-weight: 400; letter-spacing: -.025em; line-height: 1.08; text-wrap: balance; }
+h1, h2, h3, h4 { color: var(--color-ink); font-family: var(--font-display); font-weight: 500; letter-spacing: var(--tracking-display); line-height: 1.06; text-wrap: balance; overflow-wrap: break-word; min-width: 0; }
+h1 { font-size: clamp(2rem, 4vw, 3.1rem); }
+h2 { font-size: clamp(1.5rem, 2.7vw, 2.1rem); }
+h3 { font-size: 1.2rem; letter-spacing: -.02em; }
 p { text-wrap: pretty; }
 svg { flex-shrink: 0; }
 
-/* One colour family, paper surfaces, and printer's rules replace the dashboard kit. */
+/* Console surfaces: quiet edges, stepped paper, and two clear signal colours. */
 .bg-background { background-color: var(--color-paper); }
 .bg-card, .bg-card\/60, .bg-card\/40, .bg-card\/30, .bg-card\/80 { background-color: var(--color-paper-2); color: var(--color-ink); }
-.glass, .glass-card { background: var(--color-paper-2); color: var(--color-ink); border: 0; backdrop-filter: none; -webkit-backdrop-filter: none; box-shadow: none; }
+.bg-secondary, .bg-secondary\/30, .bg-secondary\/40, .bg-secondary\/50, .bg-secondary\/60 { background-color: var(--color-paper-2); color: var(--color-ink); }
+.glass, .glass-card { background: var(--color-paper-2); color: var(--color-ink); border: 1px solid var(--color-rule); box-shadow: none; backdrop-filter: none; -webkit-backdrop-filter: none; }
 [class*="bg-gradient-to-"] { background-image: none !important; background-color: var(--color-paper-2); color: var(--color-ink); }
 [class*="shadow-"] { box-shadow: none !important; }
-[class*="rounded-"] { border-radius: 0 !important; }
 [class*="uppercase"], [class*="tracking-"] { letter-spacing: normal; text-transform: none; }
-[class*="text-indigo-"], [class*="text-purple-"], [class*="text-pink-"], [class*="text-amber-"] { color: var(--color-accent); }
-[class*="text-emerald-"] { color: var(--color-success); }
-[class*="text-red-"] { color: var(--color-error); }
-[class*="bg-indigo-"], [class*="bg-purple-"], [class*="bg-pink-"], [class*="bg-amber-"] { background-color: color-mix(in oklab, var(--color-accent) 12%, var(--color-paper)); }
-[class*="bg-emerald-"] { background-color: color-mix(in oklab, var(--color-success) 12%, var(--color-paper)); }
-[class*="bg-red-"] { background-color: color-mix(in oklab, var(--color-error) 12%, var(--color-paper)); }
-[class*="border-indigo-"], [class*="border-purple-"], [class*="border-pink-"], [class*="border-amber-"] { border-color: color-mix(in oklab, var(--color-accent) 48%, var(--color-rule)); }
-[class*="border-emerald-"] { border-color: color-mix(in oklab, var(--color-success) 48%, var(--color-rule)); }
-[class*="border-red-"] { border-color: color-mix(in oklab, var(--color-error) 48%, var(--color-rule)); }
+[class*="text-indigo-"], [class*="text-purple-"], [class*="text-pink-"], [class*="text-amber-"], [class*="text-primary-"] { color: var(--color-accent); }
+[class*="text-blue-"] { color: var(--color-cool); }
+[class*="text-emerald-"], [class*="text-success-"] { color: var(--color-success); }
+[class*="text-red-"], [class*="text-danger-"] { color: var(--color-error); }
+[class*="bg-indigo-"], [class*="bg-purple-"], [class*="bg-pink-"], [class*="bg-amber-"], [class*="bg-primary-"] { background-color: var(--color-accent-soft); }
+[class*="bg-blue-"] { background-color: var(--color-cool-soft); }
+[class*="bg-emerald-"], [class*="bg-success-"] { background-color: var(--color-success-soft); }
+[class*="bg-red-"], [class*="bg-danger-"] { background-color: var(--color-error-soft); }
+[class*="border-indigo-"], [class*="border-purple-"], [class*="border-pink-"], [class*="border-amber-"], [class*="border-primary-"] { border-color: color-mix(in oklab, var(--color-accent) 48%, var(--color-rule)); }
+[class*="border-blue-"] { border-color: color-mix(in oklab, var(--color-cool) 48%, var(--color-rule)); }
+[class*="border-emerald-"], [class*="border-success-"] { border-color: color-mix(in oklab, var(--color-success) 45%, var(--color-rule)); }
+[class*="border-red-"], [class*="border-danger-"] { border-color: color-mix(in oklab, var(--color-error) 45%, var(--color-rule)); }
 
-header.sticky { background: var(--color-paper); border-bottom: 1px solid var(--color-ink); backdrop-filter: none; }
-header a:first-child > div:first-child { background: var(--color-ink); color: var(--color-paper); }
-div.bg-secondary.text-white { color: var(--color-ink); }
+header.sticky { background: color-mix(in oklab, var(--color-paper) 94%, transparent); border-bottom: 1px solid var(--color-rule); backdrop-filter: blur(12px); }
+header a:first-child > div:first-child { background: var(--color-accent-soft); color: var(--color-accent); }
 header nav a[aria-current="page"], header nav a:hover { color: var(--color-accent); }
 aside { background: var(--color-paper-2) !important; border-color: var(--color-rule) !important; }
 aside button, aside a { min-height: 40px; }
-.prose-custom { color: var(--color-ink); font-size: 1rem; line-height: 1.65; }
+button { border-radius: var(--radius-control); transition: color var(--dur-short) var(--ease-out), background-color var(--dur-short) var(--ease-out), border-color var(--dur-short) var(--ease-out); }
+button:disabled { opacity: .55; cursor: not-allowed; }
+button:active { transform: translateY(1px); }
+button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
+button.bg-primary, button[class*="bg-gradient-to-r"] { background: var(--color-accent) !important; color: var(--color-accent-ink) !important; border: 1px solid var(--color-accent); }
+button.bg-primary:hover, button[class*="bg-gradient-to-r"]:hover { filter: brightness(.96); }
+input, select, textarea { background-color: var(--color-paper) !important; color: var(--color-ink) !important; border-color: var(--color-rule-2) !important; border-radius: var(--radius-control) !important; }
+input::placeholder, textarea::placeholder { color: var(--color-muted); }
+form, section, [role="tabpanel"] { min-width: 0; }
+
+.study-app { min-height: calc(100vh - 4rem); background: var(--color-paper); }
+.study-chat { min-width: 0; background: var(--color-paper); }
+.study-home { width: min(100%, 960px); align-self: center; }
+.study-mark { margin-bottom: var(--space-lg); border-radius: 16px; color: var(--color-accent); background: var(--color-accent-soft); }
+.study-heading { max-width: 720px; }
+.study-heading h1 { max-width: 13ch; font-size: clamp(2.5rem, 5vw, 4.5rem); font-weight: 500; line-height: 1.02; }
+.study-heading p { max-width: 58ch; font-size: 1.05rem; }
+.study-proof { border-top: 1px solid var(--color-rule); padding-top: var(--space-md); }
+.study-proof > div { min-height: 116px; padding: var(--space-md) 1.1rem; border: 1px solid var(--color-rule); border-radius: var(--radius-panel); background: var(--color-paper-2); }
+.study-proof > div > div:first-child { color: var(--color-ink); font-size: .9rem; }
+.study-proof > div > p { font-size: .9rem; line-height: 1.5; }
+.study-prompts { border-top: 1px solid var(--color-rule); padding-top: var(--space-md); }
+.study-prompts > span { color: var(--color-muted); font-size: .875rem; font-weight: 500; }
+.study-prompts button { min-height: 40px; border-radius: 999px; text-align: left; background: var(--color-paper-2); }
+.study-input { border-color: var(--color-rule-2) !important; border-radius: 16px; box-shadow: 0 0 0 4px color-mix(in oklab, var(--color-paper-2) 80%, transparent); }
+.study-input:focus-within { border-color: var(--color-accent) !important; }
+.study-input button { min-width: 44px; min-height: 44px; border-radius: 12px; }
+.study-chat > div:last-child { background: var(--color-paper); border-color: var(--color-rule); backdrop-filter: none; }
+.prose-custom { color: var(--color-ink); font-size: 1rem; line-height: 1.7; }
 .prose-custom p { margin-bottom: .85rem; }
 .prose-custom h1, .prose-custom h2, .prose-custom h3, .prose-custom h4 { margin: 1.4rem 0 .6rem; }
 .prose-custom ul, .prose-custom ol { margin: 0 0 var(--space-md) 1.35rem; }
 .prose-custom table { width: 100%; border-collapse: collapse; margin: var(--space-md) 0; }
 .prose-custom th, .prose-custom td { padding: .65rem .75rem; border: 0; border-bottom: 1px solid var(--color-rule); text-align: left; }
 .prose-custom th { background: var(--color-paper-2); }
+.prose-custom :is(pre, code) { font-family: var(--font-outlier); }
 .katex-display { overflow-x: auto; overflow-y: hidden; margin: .85rem 0 !important; }
-input, select, textarea { background-color: var(--color-paper) !important; color: var(--color-ink) !important; border-color: var(--color-rule) !important; border-radius: 0 !important; }
-button.bg-primary, button[class*="bg-gradient-to-r"] { background: var(--color-ink) !important; color: var(--color-paper) !important; border: 2px solid var(--color-ink); }
-button.bg-primary:hover, button[class*="bg-gradient-to-r"]:hover { background: var(--color-accent) !important; border-color: var(--color-accent); }
-button { border-radius: 0 !important; transition: color var(--dur-short) var(--ease-out), background-color var(--dur-short) var(--ease-out), border-color var(--dur-short) var(--ease-out); }
-button:disabled { opacity: .55; cursor: not-allowed; }
-button:active { transform: translateY(1px); }
-button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
-form, section, [role="tabpanel"] { min-width: 0; }
-.study-chat { min-width: 0; }
-.study-home { width: min(100%, 960px); align-self: center; }
-.study-mark { margin-bottom: 1.75rem; color: var(--color-paper); }
-.study-heading { max-width: 680px; }
-.study-heading h1 { max-width: 11ch; font-family: var(--font-display); font-size: clamp(2.65rem, 5.4vw, 5rem); font-weight: 400; line-height: .98; }
-.study-heading p { max-width: 58ch; font-size: 1.05rem; }
-.study-proof { border-top: var(--rule-bar) solid var(--color-ink); }
-.study-proof > div { padding: 1.15rem .9rem 0 0; border: 0; border-top: 1px solid var(--color-rule); background: transparent; }
-.study-proof > div > div:first-child { font-size: .95rem; color: var(--color-ink); }
-.study-proof > div > p { font-size: .9rem; line-height: 1.45; }
-.study-prompts { border-top: 1px solid var(--color-rule); }
-.study-prompts > span { color: var(--color-muted); font-size: .85rem; font-weight: 500; text-transform: none; letter-spacing: normal; }
-.study-prompts button { min-height: 40px; border-radius: 0; text-align: left; }
-.study-input { border-color: var(--color-ink) !important; }
-.study-input button { min-width: 44px; min-height: 44px; }
-.pricing-heading h1 { font-family: var(--font-display); font-size: clamp(2.6rem, 5.2vw, 4.5rem); line-height: .98; max-width: 12ch; }
-.pricing-page > div.grid { gap: 2rem; }
-.pricing-page > div.grid > div { border: 0; border-top: var(--rule-bar) solid var(--color-ink); background: transparent; padding: var(--space-lg) 0; box-shadow: none; }
-.pricing-page > div.grid > div + div { border-color: var(--color-accent); }
-.pricing-page h2, .pricing-page h3 { font-family: var(--font-display-2); }
+
+.pricing-page { width: min(100%, 1152px); }
+.pricing-heading h1 { max-width: 13ch; font-size: clamp(2.5rem, 5vw, 4.25rem); line-height: 1.02; }
+.pricing-page > div.grid { gap: 1.25rem; }
+.pricing-page > div.grid > div { border: 1px solid var(--color-rule); border-radius: var(--radius-card); background: var(--color-paper-2); padding: clamp(1.25rem, 3vw, 2rem); box-shadow: none; }
+.pricing-page > div.grid > div + div { border-color: color-mix(in oklab, var(--color-accent) 55%, var(--color-rule)); }
+.pricing-page > div.grid > div > div:first-child > div:first-child { align-items: flex-start; }
+.pricing-page h2, .pricing-page h3 { font-family: var(--font-display); font-weight: 500; }
 .pricing-page table { min-width: 36rem; font-size: .95rem; font-variant-numeric: tabular-nums; }
-.pricing-page > div:has(> table) { overflow-x: auto; }
-.admin-shell > div:first-child { border-color: var(--color-ink); }
-.admin-shell [class*="glass-card"] { border-top: 1px solid var(--color-rule); background: transparent; }
+.pricing-page > div:has(> table) { overflow-x: auto; border-radius: var(--radius-panel); }
+.pricing-page th, .pricing-page td { border-bottom: 1px solid var(--color-rule); }
+.pricing-page [class*="rounded-full"] { border-radius: 999px; }
+.pricing-page > div.grid > div + div > button, .pricing-page button[class*="bg-gradient-to-r"] { border-radius: 10px; }
+
+.admin-shell { width: min(100%, 1280px); }
+.admin-shell > div:first-child { border-color: var(--color-rule); }
+.admin-shell [class*="glass-card"] { border: 1px solid var(--color-rule); border-radius: var(--radius-panel); background: var(--color-paper-2); color: var(--color-ink); }
 .admin-shell table { border-collapse: collapse; }
-.admin-shell th { background: var(--color-paper-2); font-weight: 600; }
+.admin-shell th { background: var(--color-paper-3); font-weight: 500; white-space: nowrap; }
 .admin-shell td, .admin-shell th { border-color: var(--color-rule); }
 .admin-shell :is(input, select, textarea) { min-height: 40px; }
-.admin-shell [role="tabpanel"] > div { border-radius: 0; box-shadow: none; }
-.prose-custom :is(pre, code) { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
-@media (max-width: 60rem) { :root { --gutter: 24px; --gap-columns: 16px; } }
-@media (max-width: 40rem) { :root { --gutter: 16px; } }
-@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; } }
+.admin-shell [role="tabpanel"] > div { box-shadow: none; }
+.admin-shell table tr:hover { background: color-mix(in oklab, var(--color-cool-soft) 45%, transparent); }
+.admin-shell [class*="font-mono"], .admin-shell code { font-family: var(--font-outlier); font-variant-numeric: tabular-nums slashed-zero; }
+
+@media (max-width: 60rem) {
+  :root { --gutter: 24px; --gap-columns: 16px; }
+  .study-app { min-height: calc(100vh - 4rem); }
+  .pricing-page, .admin-shell { width: 100%; }
+}
+@media (max-width: 40rem) {
+  :root { --gutter: 16px; }
+  .study-heading h1 { font-size: clamp(2.25rem, 11vw, 3.5rem); }
+  .study-proof { grid-template-columns: 1fr; }
+  .pricing-page { padding-top: 2rem; }
+  .admin-shell table { min-width: 720px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
+}
