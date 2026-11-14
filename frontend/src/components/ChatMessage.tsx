@@ -64,12 +64,12 @@ export function ChatMessage({ message }: ChatMessageProps) {
       <div
         className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 mt-0.5 shadow-sm ${
           message.thinking_mode
-            ? "bg-gradient-to-tr from-purple-600 to-pink-500 text-white"
-            : "bg-gradient-to-tr from-indigo-600 to-indigo-500 text-white"
+            ? "bg-secondary   text-white"
+            : "bg-secondary   text-white"
         }`}
       >
         {message.thinking_mode ? (
-          <Brain className="w-4 h-4 animate-pulse" />
+          <Brain className="w-4 h-4 " />
         ) : (
           <Bot className="w-4 h-4" />
         )}
@@ -80,14 +80,14 @@ export function ChatMessage({ message }: ChatMessageProps) {
         {/* Route / Metadata Badges */}
         <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
           {message.route === "summary" && (
-            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-              <Zap className="w-3 h-3" /> Chapter Summary • 0 quota
+            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full font-medium bg-success-500/10 text-success-600 dark:text-success-400 border border-success-500/20">
+              <Zap className="w-3 h-3" /> Chapter Summary, no quota
             </span>
           )}
 
           {message.route === "syllabus" && (
-            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full font-medium bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
-              <Bookmark className="w-3 h-3" /> Official Syllabus • 0 quota
+            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full font-medium bg-primary-500/10 text-primary-600 dark:text-primary-400 border border-primary-500/20">
+              <Bookmark className="w-3 h-3" /> Official Syllabus, no quota
             </span>
           )}
 
@@ -98,13 +98,13 @@ export function ChatMessage({ message }: ChatMessageProps) {
           )}
 
           {message.thinking_mode && (
-            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full font-semibold bg-purple-500/15 text-purple-600 dark:text-purple-400 border border-purple-500/30 shadow-sm">
-              <Brain className="w-3 h-3 text-purple-500" /> Deep Reasoning (Thinking Mode)
+            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full font-semibold bg-primary-500/15 text-primary-600 dark:text-primary-400 border border-primary-500/30 shadow-sm">
+              <Brain className="w-3 h-3 text-primary-500" /> Deep Reasoning (Thinking Mode)
             </span>
           )}
 
           {message.detected_detailed && !message.thinking_mode && (
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-medium bg-indigo-500/10 text-indigo-500 border border-indigo-500/20">
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-medium bg-primary-500/10 text-primary-500 border border-primary-500/20">
               Detailed Scope (2 units)
             </span>
           )}
@@ -131,9 +131,9 @@ export function ChatMessage({ message }: ChatMessageProps) {
                     if (!inline && match) {
                       const codeIdx = Math.floor(Math.random() * 10000);
                       return (
-                        <div className="relative my-3 rounded-xl overflow-hidden border border-border bg-slate-950 text-slate-100 font-mono text-xs">
-                          <div className="flex items-center justify-between px-3.5 py-1.5 bg-slate-900 border-b border-slate-800 text-slate-400 text-[11px]">
-                            <span className="uppercase font-semibold tracking-wider">
+                        <div className="relative my-3 rounded-xl overflow-hidden border border-border bg-code-950 text-code-100 font-mono text-xs">
+                          <div className="flex items-center justify-between px-3.5 py-1.5 bg-code-900 border-b border-code-800 text-code-400 text-[11px]">
+                            <span className=" font-semibold ">
                               {match[1]}
                             </span>
                             <button
@@ -142,7 +142,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
                             >
                               {codeCopiedIndex === codeIdx ? (
                                 <>
-                                  <Check className="w-3 h-3 text-emerald-400" /> Copied
+                                  <Check className="w-3 h-3 text-success-400" /> Copied
                                 </>
                               ) : (
                                 <>
@@ -173,13 +173,13 @@ export function ChatMessage({ message }: ChatMessageProps) {
               </ReactMarkdown>
 
               {message.isStreaming && (
-                <span className="inline-block w-1.5 h-4 ml-1 bg-primary animate-pulse align-middle" />
+                <span className="inline-block w-1.5 h-4 ml-1 bg-primary  align-middle" />
               )}
             </div>
           ) : (
-            <div className="flex items-center gap-2 text-xs text-muted-foreground animate-pulse py-2">
+            <div className="flex items-center gap-2 text-xs text-muted-foreground  py-2">
               <Sparkles className="w-4 h-4 text-primary animate-spin" />
-              <span>Analyzing semester documents and reasoning...</span>
+              <span>Analyzing semester documents and reasoning…</span>
             </div>
           )}
 
@@ -196,7 +196,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
               >
                 {copied ? (
                   <>
-                    <Check className="w-3.5 h-3.5 text-emerald-500" />
+                    <Check className="w-3.5 h-3.5 text-success-500" />
                     <span>Copied</span>
                   </>
                 ) : (
@@ -215,12 +215,12 @@ export function ChatMessage({ message }: ChatMessageProps) {
           <div
             className={`flex items-center justify-between p-3 rounded-xl border text-xs ${
               message.hint === "upgrade_for_thinking"
-                ? "bg-gradient-to-r from-purple-500/10 via-indigo-500/10 to-transparent border-purple-500/30 text-purple-700 dark:text-purple-300"
-                : "bg-indigo-500/10 border-indigo-500/20 text-indigo-700 dark:text-indigo-300"
+                ? "bg-secondary   to-transparent border-primary-500/30 text-primary-700 dark:text-primary-300"
+                : "bg-primary-500/10 border-primary-500/20 text-primary-700 dark:text-primary-300"
             }`}
           >
             <div className="flex items-center gap-2">
-              <Brain className="w-4 h-4 text-purple-500 shrink-0" />
+              <Brain className="w-4 h-4 text-primary-500 shrink-0" />
               <span>
                 {message.hint === "upgrade_for_thinking"
                   ? "Complex question detected. Unlock Gemini Flash Thinking for deep multi-step derivations and proofs."
@@ -243,8 +243,8 @@ export function ChatMessage({ message }: ChatMessageProps) {
         {message.citations && message.citations.length > 0 && (
           <div className="space-y-2 pt-1">
             <div className="flex items-center justify-between text-[11px] font-semibold text-muted-foreground">
-              <span className="flex items-center gap-1.5 uppercase tracking-wider">
-                <Bookmark className="w-3.5 h-3.5 text-indigo-500" /> Grounded In {message.citations.length} Semester Sources
+              <span className="flex items-center gap-1.5  ">
+                <Bookmark className="w-3.5 h-3.5 text-primary-500" /> Grounded In {message.citations.length} Semester Sources
               </span>
               <span className="text-[10px] text-muted-foreground font-normal">
                 Click any source to preview verified PDF page

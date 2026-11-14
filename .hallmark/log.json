@@ -1,0 +1,26 @@
+[
+ {
+  "mode": "redesign",
+  "depth": "full",
+  "scope": "site",
+  "shape": "app screen",
+  "theme": "Broadside (bill)",
+  "axes": "warm paper / serif display / vermilion signal",
+  "hero": "course question and citation-led study interface",
+  "nav": "compact course header",
+  "footer": "kept",
+  "imagery": "none",
+  "photos": [],
+  "entry": "redesign",
+  "fingerprint": "broadside-paper-ink-chat",
+  "sections": [
+   "student chat",
+   "pricing",
+   "admin control center"
+  ],
+  "signature": "cited answer and source page",
+  "waived": [],
+  "prompt": "PESU students studying from semester textbooks with cited answers",
+  "date": "2026-11-14"
+ }
+]

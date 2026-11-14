@@ -36,7 +36,7 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfileState] = useState<StudentProfile>(DEFAULT_PROFILE);
-  const [isDarkMode, setIsDarkMode] = useState<boolean>(true);
+  const [isDarkMode, setIsDarkMode] = useState<boolean>(false);
   const [quota, setQuota] = useState<QuotaRemaining | null>(null);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState<boolean>(false);
   const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState<boolean>(false);
@@ -62,7 +62,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           document.documentElement.classList.remove("dark");
         }
       } else {
-        document.documentElement.classList.add("dark");
+        document.documentElement.classList.remove("dark");
       }
     } catch (e) {
       console.warn("Storage access failed", e);

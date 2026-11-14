@@ -11,18 +11,18 @@ export function PdfViewerModal() {
   const { citation } = pdfPreview;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="relative w-full max-w-3xl rounded-2xl glass-card border border-border shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 animate-in fade-in duration-200">
+      <div className="relative w-full max-w-3xl glass-card overflow-hidden overflow-hidden flex flex-col max-h-[90vh]">
         {/* Modal Header */}
         <div className="flex items-center justify-between p-4 border-b border-border bg-card/90">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-indigo-500/10 text-indigo-500 flex items-center justify-center">
+            <div className="w-10 h-10 rounded-xl bg-primary-500/10 text-primary-500 flex items-center justify-center">
               <BookOpen className="w-5 h-5" />
             </div>
             <div>
               <h3 className="font-semibold text-foreground text-sm flex items-center gap-2">
                 {citation.subject}
-                <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-secondary uppercase text-muted-foreground border border-border">
+                <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-secondary  text-muted-foreground border border-border">
                   {citation.doc_type}
                 </span>
               </h3>
@@ -44,7 +44,7 @@ export function PdfViewerModal() {
 
         {/* Modal Content / Preview */}
         <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-background/50">
-          <div className="flex items-center gap-2 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs">
+          <div className="flex items-center gap-2 p-3 rounded-xl bg-success-500/10 border border-success-500/20 text-success-600 dark:text-success-400 text-xs">
             <CheckCircle2 className="w-4 h-4 shrink-0" />
             <span>
               <strong>Grounded Source:</strong> This answer was generated strictly from the
@@ -53,9 +53,9 @@ export function PdfViewerModal() {
           </div>
 
           {/* PDF Page Mock View */}
-          <div className="relative border border-border rounded-xl p-8 bg-card shadow-inner space-y-4 min-h-[360px] flex flex-col justify-between">
+          <div className="relative p-8 space-y-4 min-h-[360px] flex flex-col justify-between">
             <div className="flex items-center justify-between border-b border-border/60 pb-3 text-xs text-muted-foreground">
-              <span className="font-medium text-foreground">{citation.subject} — Syllabus & Coursebook</span>
+              <span className="font-medium text-foreground">{citation.subject}, Syllabus & Coursebook</span>
               <span>
                 Page {citation.page_start ?? 1}
                 {citation.page_end && citation.page_end !== citation.page_start
@@ -72,7 +72,7 @@ export function PdfViewerModal() {
                 This textbook section contains the definitive curriculum definitions, mathematical
                 formulations, theorems, and proofs prescribed by the department academic board.
               </p>
-              <div className="p-4 rounded-lg bg-secondary/60 border border-border/80 font-mono text-xs text-muted-foreground">
+              <div className="p-4 rounded-lg bg-secondary/60 border border-border/80 text-xs text-muted-foreground">
                 [Verified Document Chunk #{citation.document_id.slice(0, 8)}]
                 <br />
                 Subject: {citation.subject} | Doc Type: {citation.doc_type}
@@ -95,7 +95,7 @@ export function PdfViewerModal() {
         {/* Modal Footer */}
         <div className="p-4 border-t border-border bg-card/90 flex items-center justify-between">
           <span className="text-xs text-muted-foreground">
-            Document ID: <code className="text-foreground">{citation.document_id.slice(0, 12)}...</code>
+            Document ID: <code className="text-foreground">{citation.document_id.slice(0, 12)}…</code>
           </span>
           <div className="flex items-center gap-2">
             <button

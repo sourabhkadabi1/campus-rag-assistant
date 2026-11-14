@@ -66,8 +66,12 @@ export default function StudentChatPage() {
   };
 
   useEffect(() => {
-    scrollToBottom();
+    if (messages.length > 0 || queueInfo) scrollToBottom();
   }, [messages, queueInfo]);
+
+  useEffect(() => {
+    if (window.innerWidth < 768) setIsSidebarOpen(false);
+  }, []);
 
   // Handle switching sessions
   const handleSelectSession = async (newSessionId: string) => {
@@ -110,7 +114,7 @@ export default function StudentChatPage() {
     let activeSessionId = sessionId;
     if (!activeSessionId) {
       try {
-        const titleSnippet = q.slice(0, 30) + (q.length > 30 ? "..." : "");
+        const titleSnippet = q.slice(0, 30) + (q.length > 30 ? "…" : "");
         const newSession = await createChatSession(profile, titleSnippet);
         activeSessionId = newSession.id;
         setSessionId(activeSessionId);
@@ -274,7 +278,7 @@ export default function StudentChatPage() {
   };
 
   return (
-    <div className="flex-1 flex overflow-hidden">
+    <div className="study-app flex-1 flex overflow-hidden">
       {/* Sidebar */}
       <Sidebar
         currentSessionId={sessionId}
@@ -286,19 +290,19 @@ export default function StudentChatPage() {
       />
 
       {/* Main Chat Area */}
-      <div className="flex-1 flex flex-col h-[calc(100vh-4rem)] bg-background overflow-hidden relative">
+      <div className="study-chat flex-1 flex flex-col h-[calc(100vh-4rem)] bg-background overflow-hidden relative">
         {/* Messages Scroll Area */}
         <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-6 space-y-6">
           {messages.length === 0 ? (
             /* Empty State Hero */
-            <div className="max-w-2xl mx-auto my-auto text-center py-12 px-4 space-y-6 animate-in fade-in zoom-in-95 duration-200">
-              <div className="w-16 h-16 rounded-3xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-purple-500 text-white flex items-center justify-center mx-auto shadow-xl shadow-indigo-500/20">
+            <div className="study-home max-w-4xl mx-auto my-auto py-10 px-4 space-y-7">
+              <div className="study-mark w-12 h-12 bg-secondary    text-white flex items-center justify-center">
                 <GraduationCap className="w-8 h-8" />
               </div>
 
-              <div className="space-y-2">
-                <h1 className="text-2xl sm:text-3xl font-extrabold text-foreground tracking-tight">
-                  Welcome to PESU Academy AI
+              <div className="study-heading space-y-3">
+                <h1 className="text-4xl sm:text-6xl font-extrabold text-foreground ">
+                  Find it in your course notes
                 </h1>
                 <p className="text-sm text-muted-foreground max-w-lg mx-auto">
                   Ask questions grounded exclusively in your verified{" "}
@@ -307,9 +311,9 @@ export default function StudentChatPage() {
               </div>
 
               {/* Feature Pill Grid */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-left">
+              <div className="study-proof grid grid-cols-1 sm:grid-cols-3 gap-5 text-left">
                 <div className="p-3.5 rounded-xl border border-border bg-card/60 space-y-1">
-                  <div className="flex items-center gap-2 text-indigo-500 font-semibold text-xs">
+                  <div className="flex items-center gap-2 text-primary-500 font-semibold text-xs">
                     <Bookmark className="w-4 h-4" /> Exact Citations
                   </div>
                   <p className="text-[11px] text-muted-foreground">
@@ -318,7 +322,7 @@ export default function StudentChatPage() {
                 </div>
 
                 <div className="p-3.5 rounded-xl border border-border bg-card/60 space-y-1">
-                  <div className="flex items-center gap-2 text-emerald-500 font-semibold text-xs">
+                  <div className="flex items-center gap-2 text-success-500 font-semibold text-xs">
                     <Zap className="w-4 h-4" /> Instant Summaries
                   </div>
                   <p className="text-[11px] text-muted-foreground">
@@ -327,7 +331,7 @@ export default function StudentChatPage() {
                 </div>
 
                 <div className="p-3.5 rounded-xl border border-border bg-card/60 space-y-1">
-                  <div className="flex items-center gap-2 text-purple-500 font-semibold text-xs">
+                  <div className="flex items-center gap-2 text-primary-500 font-semibold text-xs">
                     <Brain className="w-4 h-4" /> Deep Thinking
                   </div>
                   <p className="text-[11px] text-muted-foreground">
@@ -337,8 +341,8 @@ export default function StudentChatPage() {
               </div>
 
               {/* Suggested Questions */}
-              <div className="pt-2">
-                <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider block mb-2">
+              <div className="study-prompts pt-2">
+                <span className="text-[11px] font-semibold text-muted-foreground   block mb-2">
                   Try asking
                 </span>
                 <div className="flex flex-wrap justify-center gap-2">
@@ -353,7 +357,7 @@ export default function StudentChatPage() {
                       onClick={() => handleQuickPrompt(sample, idx % 2 === 1)}
                       className="px-3 py-1.5 rounded-full border border-border text-xs text-foreground/80 hover:text-foreground hover:bg-secondary transition-colors"
                     >
-                      {sample} →
+                      {sample}
                     </button>
                   ))}
                 </div>
@@ -366,9 +370,9 @@ export default function StudentChatPage() {
 
           {/* Queue Indicator Banner */}
           {queueInfo && (
-            <div className="max-w-4xl mx-auto p-3.5 rounded-2xl border border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300 flex items-center justify-between animate-pulse text-xs">
-              <div className="flex items-center gap-2">
-                <Clock className="w-4 h-4 animate-spin text-amber-500" />
+            <div className="max-w-4xl mx-auto p-3.5 rounded-2xl border border-primary-500/30 bg-primary-500/10 text-primary-700 dark:text-primary-300 flex items-center justify-between  text-xs">
+              <div className="flex items-center gap-2 flex-wrap">
+                <Clock className="w-4 h-4 animate-spin text-primary-500" />
                 <span>
                   High campus traffic: You are at <strong>position #{queueInfo.position}</strong> in the model request queue.
                 </span>
@@ -397,7 +401,7 @@ export default function StudentChatPage() {
                   onClick={() => setIsDetailed(!isDetailed)}
                   className={`flex items-center gap-1.5 px-3 py-1 rounded-full border text-xs font-medium transition-colors ${
                     isAutoDetailed || isDetailed
-                      ? "bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 border-indigo-500/30"
+                      ? "bg-primary-500/15 text-primary-600 dark:text-primary-400 border-primary-500/30"
                       : "bg-secondary/60 text-muted-foreground border-border hover:text-foreground"
                   }`}
                 >
@@ -407,7 +411,7 @@ export default function StudentChatPage() {
                   </span>
                 </button>
 
-                {/* Thinking Mode Toggle (Paid only) */}
+                {/* Thinking Toggle (Paid only) */}
                 <button
                   type="button"
                   onClick={() => {
@@ -417,20 +421,20 @@ export default function StudentChatPage() {
                       setUseThinking(!useThinking);
                     }
                   }}
-                  className={`flex items-center gap-1.5 px-3 py-1 rounded-full border text-xs font-medium transition-all ${
+                  className={`flex items-center gap-1.5 px-3 py-1 rounded-full border text-xs font-medium transition-colors ${
                     useThinking && profile.is_paid
-                      ? "bg-gradient-to-r from-purple-500/20 to-pink-500/20 text-purple-600 dark:text-purple-400 border-purple-500/40 shadow-sm"
+                      ? "bg-secondary   text-primary-600 dark:text-primary-400 border-primary-500/40 shadow-sm"
                       : "bg-secondary/60 text-muted-foreground border-border hover:text-foreground"
                   }`}
                 >
-                  <Brain className={`w-3.5 h-3.5 ${useThinking && profile.is_paid ? "text-purple-500 animate-pulse" : ""}`} />
+                  <Brain className={`w-3.5 h-3.5 ${useThinking && profile.is_paid ? "text-primary-500 " : ""}`} />
                   <span>Thinking Mode</span>
                   {!profile.is_paid ? (
-                    <span className="text-[10px] uppercase font-bold px-1.5 py-0.2 rounded bg-amber-500/15 text-amber-500">
+                    <span className="text-[10px]  font-bold px-1.5 py-0.2 rounded bg-primary-500/15 text-primary-500">
                       Paid
                     </span>
                   ) : (
-                    <span className="text-[10px] text-purple-500 font-semibold">
+                    <span className="text-[10px] text-primary-500 font-semibold">
                       (3 units + 1 credit)
                     </span>
                   )}
@@ -442,7 +446,7 @@ export default function StudentChatPage() {
                 {isStreaming && (
                   <button
                     onClick={handleStopStreaming}
-                    className="flex items-center gap-1 px-2.5 py-1 rounded-lg border border-red-500/30 bg-red-500/10 text-red-500 hover:bg-red-500/20 transition-colors"
+                    className="flex items-center gap-1 px-2.5 py-1 rounded-lg border border-danger-500/30 bg-danger-500/10 text-danger-500 hover:bg-danger-500/20 transition-colors"
                   >
                     <StopCircle className="w-3.5 h-3.5" /> Stop Generating
                   </button>
@@ -454,7 +458,7 @@ export default function StudentChatPage() {
             </div>
 
             {/* Main Textarea Container */}
-            <form onSubmit={handleSend} className="relative flex items-end rounded-2xl border border-border bg-background focus-within:ring-2 focus-within:ring-primary focus-within:border-primary shadow-sm overflow-hidden transition-all">
+            <form onSubmit={handleSend} className="study-input relative flex items-end border border-border bg-background focus-within:ring-2 focus-within:ring-primary focus-within:border-primary overflow-hidden">
               <textarea
                 ref={textareaRef}
                 value={inputQuestion}
@@ -465,7 +469,7 @@ export default function StudentChatPage() {
                     handleSend();
                   }
                 }}
-                placeholder={`Ask anything from your Semester ${profile.semester} syllabus (e.g. "derive time complexity", "summarize chapter 2")...`}
+                placeholder={`Ask anything from your Semester ${profile.semester} syllabus (e.g. "derive time complexity", "summarize chapter 2")…`}
                 rows={2}
                 className="flex-1 p-3.5 bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus:outline-none resize-none max-h-32"
               />
@@ -474,7 +478,7 @@ export default function StudentChatPage() {
                 <button
                   type="submit"
                   disabled={!inputQuestion.trim() || isStreaming}
-                  className="p-2.5 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-md shadow-primary/20"
+                  className="p-2.5 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed transition-colors shadow-md shadow-primary/20"
                   title="Send Question"
                 >
                   <Send className="w-4 h-4" />

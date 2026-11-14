@@ -174,7 +174,7 @@ export function DocumentUpload() {
         </div>
 
         {errorMsg && (
-          <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 text-xs flex items-center gap-2">
+          <div className="p-3 rounded-xl bg-danger-500/10 border border-danger-500/20 text-danger-600 dark:text-danger-400 text-xs flex items-center gap-2">
             <AlertTriangle className="w-4 h-4 shrink-0" />
             <span>{errorMsg}</span>
           </div>
@@ -192,7 +192,7 @@ export function DocumentUpload() {
               className="hidden"
             />
             <label htmlFor="doc-file-input" className="cursor-pointer block space-y-2">
-              <FileText className="w-8 h-8 text-indigo-500 mx-auto" />
+              <FileText className="w-8 h-8 text-primary-500 mx-auto" />
               <div className="text-xs font-medium text-foreground">
                 {file ? (
                   <span className="text-primary font-bold">{file.name} ({formatBytes(file.size)})</span>
@@ -292,11 +292,11 @@ export function DocumentUpload() {
             <button
               type="submit"
               disabled={!file || uploading}
-              className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-primary text-primary-foreground font-semibold text-xs hover:bg-primary/90 disabled:opacity-50 transition-all shadow-md shadow-primary/20"
+              className="flex items-center gap-2 whitespace-nowrap px-5 py-2.5 rounded-xl bg-primary text-primary-foreground font-semibold text-xs hover:bg-primary/90 disabled:opacity-50 transition-colors shadow-md shadow-primary/20"
             >
               {uploading ? (
                 <>
-                  <RefreshCw className="w-3.5 h-3.5 animate-spin" /> Ingesting PDF...
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin" /> Ingesting PDF…
                 </>
               ) : (
                 <>
@@ -313,7 +313,7 @@ export function DocumentUpload() {
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-2">
             <h3 className="font-semibold text-foreground text-sm flex items-center gap-2">
-              <FileText className="w-4 h-4 text-indigo-500" />
+              <FileText className="w-4 h-4 text-primary-500" />
               Indexed Documents ({documents.length})
             </h3>
             <button
@@ -401,22 +401,22 @@ export function DocumentUpload() {
                       <td className="p-3.5">
                         <div className="flex items-center gap-1.5">
                           {doc.ingestion_status === "done" && (
-                            <span className="flex items-center gap-1 text-emerald-500 font-medium">
+                            <span className="flex items-center gap-1 text-success-500 font-medium">
                               <CheckCircle2 className="w-3.5 h-3.5" /> Done
                             </span>
                           )}
                           {doc.ingestion_status === "queued" && (
-                            <span className="flex items-center gap-1 text-amber-500 font-medium">
+                            <span className="flex items-center gap-1 text-primary-500 font-medium">
                               <Clock className="w-3.5 h-3.5 animate-spin" /> Queued
                             </span>
                           )}
                           {doc.ingestion_status === "processing" && (
-                            <span className="flex items-center gap-1 text-indigo-500 font-medium">
+                            <span className="flex items-center gap-1 text-primary-500 font-medium">
                               <RefreshCw className="w-3.5 h-3.5 animate-spin" /> Processing
                             </span>
                           )}
                           {doc.ingestion_status === "failed" && (
-                            <span className="flex items-center gap-1 text-red-500 font-medium">
+                            <span className="flex items-center gap-1 text-danger-500 font-medium">
                               <AlertTriangle className="w-3.5 h-3.5" /> Failed
                             </span>
                           )}
@@ -425,9 +425,9 @@ export function DocumentUpload() {
                       <td className="p-3.5">
                         <button
                           onClick={() => handleToggleActive(doc.id, doc.is_active)}
-                          className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase transition-colors ${
+                          className={`px-2 py-0.5 rounded-full text-[10px] font-bold  transition-colors ${
                             doc.is_active
-                              ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                              ? "bg-success-500/10 text-success-600 dark:text-success-400"
                               : "bg-secondary text-muted-foreground"
                           }`}
                         >
@@ -451,7 +451,7 @@ export function DocumentUpload() {
                         </button>
                         <button
                           onClick={() => handleDelete(doc.id)}
-                          className="p-1.5 rounded-lg border border-border text-red-500 hover:bg-red-500/10 transition-colors"
+                          className="p-1.5 rounded-lg border border-border text-danger-500 hover:bg-danger-500/10 transition-colors"
                           title="Delete"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
@@ -468,11 +468,11 @@ export function DocumentUpload() {
 
       {/* Ingestion Status Detail Modal */}
       {selectedDocStatus && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-150">
-          <div className="relative w-full max-w-2xl rounded-2xl glass-card border border-border shadow-2xl overflow-hidden p-6 space-y-4 max-h-[85vh] overflow-y-auto">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 animate-in fade-in duration-150">
+          <div className="relative w-full max-w-2xl rounded-2xl glass-card overflow-hidden overflow-hidden p-6 space-y-4 max-h-[85vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-border pb-3">
               <h3 className="font-bold text-sm text-foreground flex items-center gap-2">
-                <Layers className="w-4 h-4 text-indigo-500" />
+                <Layers className="w-4 h-4 text-primary-500" />
                 Ingestion Details ({selectedDocStatus.document_id.slice(0, 8)})
               </h3>
               <button
@@ -485,25 +485,25 @@ export function DocumentUpload() {
 
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
               <div className="p-3 rounded-xl border border-border bg-secondary/40">
-                <span className="text-muted-foreground block text-[10px] uppercase font-bold">Total Pages</span>
+                <span className="text-muted-foreground block text-[10px]  font-bold">Total Pages</span>
                 <span className="text-base font-bold text-foreground">{selectedDocStatus.total_pages ?? "N/A"}</span>
               </div>
               <div className="p-3 rounded-xl border border-border bg-secondary/40">
-                <span className="text-muted-foreground block text-[10px] uppercase font-bold">Chunks Created</span>
+                <span className="text-muted-foreground block text-[10px]  font-bold">Chunks Created</span>
                 <span className="text-base font-bold text-primary">{selectedDocStatus.chunks_created}</span>
               </div>
               <div className="p-3 rounded-xl border border-border bg-secondary/40">
-                <span className="text-muted-foreground block text-[10px] uppercase font-bold">Chapters Found</span>
+                <span className="text-muted-foreground block text-[10px]  font-bold">Chapters Found</span>
                 <span className="text-base font-bold text-foreground">{selectedDocStatus.chapters_found}</span>
               </div>
               <div className="p-3 rounded-xl border border-border bg-secondary/40">
-                <span className="text-muted-foreground block text-[10px] uppercase font-bold">Summaries Stored</span>
-                <span className="text-base font-bold text-emerald-500">{selectedDocStatus.summaries_generated}</span>
+                <span className="text-muted-foreground block text-[10px]  font-bold">Summaries Stored</span>
+                <span className="text-base font-bold text-success-500">{selectedDocStatus.summaries_generated}</span>
               </div>
             </div>
 
             {selectedDocStatus.error && (
-              <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-500 text-xs">
+              <div className="p-3 rounded-xl bg-danger-500/10 border border-danger-500/20 text-danger-500 text-xs">
                 <strong>Ingestion Error:</strong> {selectedDocStatus.error}
               </div>
             )}
@@ -511,7 +511,7 @@ export function DocumentUpload() {
             {/* Generated Chapter Summaries */}
             <div className="space-y-2 pt-2">
               <h4 className="font-semibold text-xs text-foreground flex items-center gap-1.5">
-                <BookOpen className="w-3.5 h-3.5 text-indigo-500" />
+                <BookOpen className="w-3.5 h-3.5 text-primary-500" />
                 Auto-Generated Chapter Summaries ({selectedDocSummaries.length})
               </h4>
               {selectedDocSummaries.length === 0 ? (

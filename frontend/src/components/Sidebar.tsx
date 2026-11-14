@@ -77,7 +77,7 @@ export function Sidebar({
     return (
       <button
         onClick={() => setIsOpen(true)}
-        className="fixed bottom-4 left-4 z-30 p-3 rounded-2xl glass-card shadow-lg border border-border text-foreground hover:bg-secondary transition-all"
+        className="fixed bottom-4 left-4 z-30 p-3 rounded-2xl glass-card shadow-lg border border-border text-foreground hover:bg-secondary transition-colors"
         title="Open Sidebar"
       >
         <ChevronRight className="w-5 h-5 text-primary" />
@@ -86,13 +86,13 @@ export function Sidebar({
   }
 
   return (
-    <aside className="w-72 shrink-0 border-r border-border bg-card/60 backdrop-blur-md flex flex-col justify-between h-[calc(100vh-4rem)] transition-all">
+    <aside className="w-72 shrink-0 border-r border-border bg-card/60 backdrop-blur-md flex flex-col justify-between h-[calc(100vh-4rem)] transition-colors">
       <div className="p-4 space-y-4 flex-1 overflow-y-auto">
         {/* New Chat Button */}
         <div className="flex items-center gap-2">
           <button
             onClick={onNewSession}
-            className="flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl font-medium text-xs bg-primary text-primary-foreground hover:bg-primary/90 transition-all shadow-sm"
+            className="flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl font-medium text-xs bg-primary text-primary-foreground hover:bg-primary/90 transition-colors shadow-sm"
           >
             <Plus className="w-4 h-4" />
             New Chat Session
@@ -108,11 +108,11 @@ export function Sidebar({
 
         {/* Current Academic Scope Card */}
         <div className="p-3 rounded-xl border border-border bg-secondary/40 space-y-1.5 text-xs">
-          <div className="flex items-center justify-between text-muted-foreground font-semibold text-[10px] uppercase tracking-wider">
+          <div className="flex items-center justify-between text-muted-foreground font-semibold text-[10px]  ">
             <span className="flex items-center gap-1">
-              <GraduationCap className="w-3.5 h-3.5 text-indigo-500" /> Grounded Filter
+              <GraduationCap className="w-3.5 h-3.5 text-primary-500" /> Grounded Filter
             </span>
-            <span className="text-emerald-500 font-bold">Active</span>
+            <span className="text-success-500 font-bold">Active</span>
           </div>
           <p className="text-foreground font-semibold">
             Semester {profile.semester} • {profile.department}
@@ -124,7 +124,7 @@ export function Sidebar({
 
         {/* Sessions List */}
         <div className="space-y-1">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground px-2 block">
+          <span className="text-[10px] font-bold   text-muted-foreground px-2 block">
             Recent Conversations
           </span>
 
@@ -140,7 +140,7 @@ export function Sidebar({
                   <div
                     key={session.id}
                     onClick={() => onSelectSession(session.id)}
-                    className={`group flex items-center justify-between p-2.5 rounded-xl text-xs font-medium cursor-pointer transition-all ${
+                    className={`group flex items-center justify-between p-2.5 rounded-xl text-xs font-medium cursor-pointer transition-colors ${
                       isActive
                         ? "bg-secondary text-primary font-semibold border border-primary/20 shadow-sm"
                         : "text-foreground/80 hover:bg-secondary/60 hover:text-foreground"
@@ -153,7 +153,7 @@ export function Sidebar({
 
                     <button
                       onClick={(e) => handleDelete(e, session.id)}
-                      className="opacity-0 group-hover:opacity-100 p-1 text-muted-foreground hover:text-red-500 transition-opacity"
+                      className="opacity-0 group-hover:opacity-100 p-1 text-muted-foreground hover:text-danger-500 transition-opacity"
                       title="Delete session"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
@@ -167,7 +167,7 @@ export function Sidebar({
 
         {/* Suggested Quick Prompts */}
         <div className="pt-2 border-t border-border space-y-2">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground px-2 block">
+          <span className="text-[10px] font-bold   text-muted-foreground px-2 block">
             Curriculum Shortcuts
           </span>
 
@@ -176,11 +176,11 @@ export function Sidebar({
               <button
                 key={idx}
                 onClick={() => onQuickPrompt(p.title, p.detailed)}
-                className="w-full text-left p-2 rounded-xl border border-border/60 hover:border-primary/40 bg-card/40 hover:bg-secondary/60 transition-all text-xs group"
+                className="w-full text-left p-2 rounded-xl border border-border/60 hover:border-primary/40 bg-card/40 hover:bg-secondary/60 transition-colors text-xs group"
               >
                 <div className="font-medium text-foreground group-hover:text-primary transition-colors flex items-center justify-between">
                   <span>{p.title}</span>
-                  <Sparkles className="w-3 h-3 text-muted-foreground group-hover:text-amber-500" />
+                  <Sparkles className="w-3 h-3 text-muted-foreground group-hover:text-primary-500" />
                 </div>
                 <div className="text-[10px] text-muted-foreground">{p.desc}</div>
               </button>

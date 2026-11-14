@@ -19,17 +19,14 @@ export default function PricingPage() {
   const [billingCycle, setBillingCycle] = useState<"monthly" | "semester">("monthly");
 
   return (
-    <div className="flex-1 overflow-y-auto py-12 px-4 sm:px-6 max-w-6xl mx-auto space-y-16">
+    <div className="pricing-page flex-1 overflow-y-auto py-10 px-4 sm:px-6 max-w-6xl mx-auto space-y-14">
       {/* Hero Header */}
-      <div className="text-center space-y-4 max-w-2xl mx-auto">
-        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-primary/10 text-primary border border-primary/20">
-          <Sparkles className="w-3.5 h-3.5" /> Transparent College Plans
-        </span>
-        <h1 className="text-3xl sm:text-4xl font-extrabold text-foreground tracking-tight">
-          Supercharge your study sessions
+      <div className="pricing-heading text-left space-y-4 max-w-3xl">
+        <h1 className="text-4xl sm:text-6xl font-extrabold text-foreground ">
+          A clear price for semester study
         </h1>
         <p className="text-sm sm:text-base text-muted-foreground">
-          Grounded course answers, exact book citations, and deep mathematical reasoning built specifically for college exams.
+          Compare the daily limits, citations, and study tools in each plan.
         </p>
 
         {/* Billing Switcher */}
@@ -37,7 +34,7 @@ export default function PricingPage() {
           <div className="flex items-center p-1 rounded-xl bg-secondary border border-border text-xs font-medium">
             <button
               onClick={() => setBillingCycle("monthly")}
-              className={`px-4 py-2 rounded-lg transition-all ${
+              className={`px-4 py-2 rounded-lg transition-colors ${
                 billingCycle === "monthly"
                   ? "bg-background text-foreground shadow-sm font-semibold"
                   : "text-muted-foreground hover:text-foreground"
@@ -47,14 +44,14 @@ export default function PricingPage() {
             </button>
             <button
               onClick={() => setBillingCycle("semester")}
-              className={`flex items-center gap-1.5 px-4 py-2 rounded-lg transition-all ${
+              className={`flex items-center gap-1.5 px-4 py-2 rounded-lg transition-colors ${
                 billingCycle === "semester"
                   ? "bg-background text-foreground shadow-sm font-semibold"
                   : "text-muted-foreground hover:text-foreground"
               }`}
             >
               Semester pass
-              <span className="text-[10px] px-1.5 py-0.2 rounded bg-emerald-500/10 text-emerald-600 font-bold">
+              <span className="text-[10px] px-1.5 py-0.2 rounded bg-success-500/10 text-success-600 font-bold">
                 Save 25%
               </span>
             </button>
@@ -77,33 +74,33 @@ export default function PricingPage() {
 
             <div className="pt-4 border-t border-border space-y-3.5 text-xs text-foreground/90">
               <div className="flex items-start gap-3">
-                <Check className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
+                <Check className="w-4 h-4 text-success-500 shrink-0 mt-0.5" />
                 <span>
                   <strong>10 question units every day</strong> (1 unit for quick answers, 2 units for detailed step-by-step answers)
                 </span>
               </div>
               <div className="flex items-start gap-3">
-                <Check className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
+                <Check className="w-4 h-4 text-success-500 shrink-0 mt-0.5" />
                 <span>
                   <strong>40,000 tokens daily limit</strong>
                 </span>
               </div>
               <div className="flex items-start gap-3">
-                <Check className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
+                <Check className="w-4 h-4 text-success-500 shrink-0 mt-0.5" />
                 <span>
                   Full access to all uploaded textbooks, lecture notes, and syllabus materials for your semester
                 </span>
               </div>
               <div className="flex items-start gap-3">
-                <Check className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
+                <Check className="w-4 h-4 text-success-500 shrink-0 mt-0.5" />
                 <span>Exact book & page citations with every answer</span>
               </div>
               <div className="flex items-start gap-3">
-                <Check className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
+                <Check className="w-4 h-4 text-success-500 shrink-0 mt-0.5" />
                 <span>Instant chapter & unit summaries (free, zero quota consumed)</span>
               </div>
               <div className="flex items-start gap-3">
-                <Check className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
+                <Check className="w-4 h-4 text-success-500 shrink-0 mt-0.5" />
                 <span>Automatic resets every night at midnight UTC</span>
               </div>
             </div>
@@ -112,7 +109,7 @@ export default function PricingPage() {
           <button
             disabled={!profile.is_paid}
             onClick={() => {}}
-            className={`w-full py-3 rounded-2xl text-xs font-semibold transition-all ${
+            className={`w-full py-3 rounded-2xl text-xs font-semibold transition-colors ${
               !profile.is_paid
                 ? "bg-secondary text-muted-foreground border border-border cursor-default"
                 : "border border-border text-foreground hover:bg-secondary"
@@ -123,8 +120,8 @@ export default function PricingPage() {
         </div>
 
         {/* Premium Plan */}
-        <div className="relative p-8 rounded-3xl border-2 border-primary bg-gradient-to-b from-primary/10 via-card to-card flex flex-col justify-between space-y-8 shadow-2xl shadow-primary/15">
-          <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 px-4 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-gradient-to-r from-amber-500 to-purple-600 text-white shadow-md">
+        <div className="relative p-8 rounded-3xl border-2 border-primary bg-secondary from-primary/10 via-card to-card flex flex-col justify-between space-y-8 shadow-2xl shadow-primary/15">
+          <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 px-4 py-1 rounded-full text-xs font-bold   bg-secondary   text-white shadow-md">
             Recommended for Exams
           </div>
 
@@ -132,7 +129,7 @@ export default function PricingPage() {
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="text-xl font-bold text-foreground flex items-center gap-2">
-                  Premium Plan <Sparkles className="w-5 h-5 text-amber-500" />
+                  Premium Plan <Sparkles className="w-5 h-5 text-primary-500" />
                 </h3>
                 <p className="text-xs text-muted-foreground">Deep reasoning & priority queue</p>
               </div>
@@ -149,39 +146,39 @@ export default function PricingPage() {
 
             <div className="pt-4 border-t border-border space-y-3.5 text-xs text-foreground/90">
               <div className="flex items-start gap-3">
-                <Check className="w-4 h-4 text-indigo-500 shrink-0 mt-0.5" />
+                <Check className="w-4 h-4 text-primary-500 shrink-0 mt-0.5" />
                 <span>
                   <strong>30 question units every day</strong> (up to 30 normal or 15 detailed questions)
                 </span>
               </div>
               <div className="flex items-start gap-3">
-                <Check className="w-4 h-4 text-indigo-500 shrink-0 mt-0.5" />
+                <Check className="w-4 h-4 text-primary-500 shrink-0 mt-0.5" />
                 <span>
                   <strong>100,000 tokens daily limit</strong>
                 </span>
               </div>
               <div className="flex items-start gap-3">
-                <Brain className="w-4 h-4 text-purple-500 shrink-0 mt-0.5" />
+                <Brain className="w-4 h-4 text-primary-500 shrink-0 mt-0.5" />
                 <span>
-                  <strong>1 Thinking Mode question per day</strong> — deep reasoning powered by Gemini Flash Thinking for complex derivations, numericals, and proofs
+                  <strong>1 Thinking Mode question per day</strong> ; deep reasoning powered by Gemini Flash Thinking for complex derivations, numericals, and proofs
                 </span>
               </div>
               <div className="flex items-start gap-3">
-                <Zap className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+                <Zap className="w-4 h-4 text-primary-500 shrink-0 mt-0.5" />
                 <span>
-                  <strong>Priority Queue</strong> — your questions are answered first during high-demand exam weeks
+                  <strong>Priority Queue</strong> ; your questions are answered first during high-demand exam weeks
                 </span>
               </div>
               <div className="flex items-start gap-3">
-                <Check className="w-4 h-4 text-indigo-500 shrink-0 mt-0.5" />
+                <Check className="w-4 h-4 text-primary-500 shrink-0 mt-0.5" />
                 <span>Longer, more comprehensive answers (up to 2,000 output tokens)</span>
               </div>
               <div className="flex items-start gap-3">
-                <Check className="w-4 h-4 text-indigo-500 shrink-0 mt-0.5" />
+                <Check className="w-4 h-4 text-primary-500 shrink-0 mt-0.5" />
                 <span>Quiz and practice question generation</span>
               </div>
               <div className="flex items-start gap-3">
-                <Check className="w-4 h-4 text-indigo-500 shrink-0 mt-0.5" />
+                <Check className="w-4 h-4 text-primary-500 shrink-0 mt-0.5" />
                 <span>Guaranteed access even during peak campus traffic</span>
               </div>
             </div>
@@ -190,13 +187,13 @@ export default function PricingPage() {
           <div className="space-y-2">
             <button
               onClick={() => setIsUpgradeModalOpen(true)}
-              className="w-full py-3.5 rounded-2xl font-semibold text-xs text-white bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 hover:opacity-95 transition-all shadow-lg shadow-indigo-500/25 flex items-center justify-center gap-2"
+              className="w-full py-3.5 rounded-2xl font-semibold text-xs text-white bg-secondary    hover:opacity-95 transition-colors shadow-lg shadow-primary-500/25 flex items-center justify-center gap-2"
             >
               {profile.is_paid ? "Active Subscription" : "Upgrade to Premium"}
               <ArrowRight className="w-4 h-4" />
             </button>
             <div className="text-center text-[10px] text-muted-foreground flex items-center justify-center gap-1">
-              <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
+              <ShieldCheck className="w-3.5 h-3.5 text-success-500" />
               Razorpay Secured • Cancel anytime
             </div>
           </div>
@@ -229,28 +226,28 @@ export default function PricingPage() {
               </tr>
               <tr>
                 <td className="p-4 font-medium">Gemini Flash Thinking Mode</td>
-                <td className="p-4 text-center text-muted-foreground">—</td>
-                <td className="p-4 text-center font-bold text-purple-500">1 Credit / day</td>
+                <td className="p-4 text-center text-muted-foreground">Not included</td>
+                <td className="p-4 text-center font-bold text-primary-500">1 Credit / day</td>
               </tr>
               <tr>
                 <td className="p-4 font-medium">Exam Queue Priority</td>
                 <td className="p-4 text-center text-muted-foreground">Standard Queue</td>
-                <td className="p-4 text-center font-bold text-amber-500">Fast-track Priority</td>
+                <td className="p-4 text-center font-bold text-primary-500">Fast-track Priority</td>
               </tr>
               <tr>
                 <td className="p-4 font-medium">Max Output Length</td>
-                <td className="p-4 text-center text-muted-foreground">600–1,000 tokens</td>
-                <td className="p-4 text-center font-bold text-foreground">800–2,000 tokens</td>
+                <td className="p-4 text-center text-muted-foreground">600 to 1,000 tokens</td>
+                <td className="p-4 text-center font-bold text-foreground">800 to 2,000 tokens</td>
               </tr>
               <tr>
                 <td className="p-4 font-medium">Textbook & Notes Citations</td>
-                <td className="p-4 text-center text-emerald-500">Included</td>
-                <td className="p-4 text-center text-emerald-500">Included</td>
+                <td className="p-4 text-center text-success-500">Included</td>
+                <td className="p-4 text-center text-success-500">Included</td>
               </tr>
               <tr>
                 <td className="p-4 font-medium">Instant Chapter Summaries</td>
-                <td className="p-4 text-center text-emerald-500">Unlimited (0 quota)</td>
-                <td className="p-4 text-center text-emerald-500">Unlimited (0 quota)</td>
+                <td className="p-4 text-center text-success-500">Unlimited (0 quota)</td>
+                <td className="p-4 text-center text-success-500">Unlimited (0 quota)</td>
               </tr>
             </tbody>
           </table>

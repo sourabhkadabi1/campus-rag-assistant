@@ -43,7 +43,7 @@ export function MarginDashboard() {
     return (
       <div className="p-8 text-center text-xs text-muted-foreground flex items-center justify-center gap-2">
         <RefreshCw className="w-4 h-4 animate-spin text-primary" />
-        <span>Loading Margin Dashboard metrics...</span>
+        <span>Loading Margin Dashboard metrics…</span>
       </div>
     );
   }
@@ -57,8 +57,8 @@ export function MarginDashboard() {
     <div className="space-y-6">
       {/* Margin Alert Banner if triggered */}
       {data.margin_alert && (
-        <div className="p-4 rounded-2xl bg-red-500/10 border-2 border-red-500/40 text-red-700 dark:text-red-300 flex items-start gap-3 shadow-md animate-pulse">
-          <ShieldAlert className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
+        <div className="p-4 rounded-2xl bg-danger-500/10 border-2 border-danger-500/40 text-danger-700 dark:text-danger-300 flex items-start gap-3 shadow-md ">
+          <ShieldAlert className="w-5 h-5 text-danger-500 shrink-0 mt-0.5" />
           <div className="space-y-1 text-xs">
             <h4 className="font-bold text-sm">Critical Margin Warning!</h4>
             <p>
@@ -72,7 +72,7 @@ export function MarginDashboard() {
       {/* Top Action / Header */}
       <div className="flex items-center justify-between p-4 rounded-2xl glass-card border border-border">
         <div className="flex items-center gap-2.5">
-          <div className="w-9 h-9 rounded-xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center">
+          <div className="w-9 h-9 rounded-xl bg-success-500/10 text-success-500 flex items-center justify-center">
             <DollarSign className="w-5 h-5" />
           </div>
           <div>
@@ -98,7 +98,7 @@ export function MarginDashboard() {
         <div className="p-5 rounded-2xl glass-card border border-border space-y-2">
           <div className="flex items-center justify-between text-muted-foreground text-xs font-medium">
             <span>Remaining Balance</span>
-            <DollarSign className="w-4 h-4 text-emerald-500" />
+            <DollarSign className="w-4 h-4 text-success-500" />
           </div>
           <div className="text-2xl font-extrabold text-foreground">
             ${data.remaining_balance_usd.toFixed(2)}
@@ -111,11 +111,11 @@ export function MarginDashboard() {
           </div>
         </div>
 
-        {/* Today's Spend */}
+        {/* Today’s spend */}
         <div className="p-5 rounded-2xl glass-card border border-border space-y-2">
           <div className="flex items-center justify-between text-muted-foreground text-xs font-medium">
-            <span>Today's Spend</span>
-            <TrendingUp className="w-4 h-4 text-indigo-500" />
+            <span>Today’s spend</span>
+            <TrendingUp className="w-4 h-4 text-primary-500" />
           </div>
           <div className="text-2xl font-extrabold text-foreground">
             {formatCurrency(data.today_spend_usd)}
@@ -129,7 +129,7 @@ export function MarginDashboard() {
         <div className="p-5 rounded-2xl glass-card border border-border space-y-2">
           <div className="flex items-center justify-between text-muted-foreground text-xs font-medium">
             <span>Thinking Mode Spend</span>
-            <Sparkles className="w-4 h-4 text-purple-500" />
+            <Sparkles className="w-4 h-4 text-primary-500" />
           </div>
           <div className="text-2xl font-extrabold text-foreground font-mono">
             ${data.premium_spend_today_usd.toFixed(4)}
@@ -142,7 +142,7 @@ export function MarginDashboard() {
             <div className="w-full bg-secondary rounded-full h-1.5 overflow-hidden">
               <div
                 className={`h-full rounded-full ${
-                  thinkingSpendPct > 80 ? "bg-red-500" : "bg-purple-500"
+                  thinkingSpendPct > 80 ? "bg-danger-500" : "bg-primary-500"
                 }`}
                 style={{ width: `${thinkingSpendPct}%` }}
               />
@@ -154,7 +154,7 @@ export function MarginDashboard() {
         <div className="p-5 rounded-2xl glass-card border border-border space-y-2">
           <div className="flex items-center justify-between text-muted-foreground text-xs font-medium">
             <span>Cache Hit Rate</span>
-            <Zap className="w-4 h-4 text-amber-500" />
+            <Zap className="w-4 h-4 text-primary-500" />
           </div>
           <div className="text-2xl font-extrabold text-foreground">
             {(data.cache_hit_rate * 100).toFixed(1)}%
@@ -170,7 +170,7 @@ export function MarginDashboard() {
         {/* Unit Economics Breakdown */}
         <div className="p-6 rounded-2xl glass-card border border-border space-y-4">
           <h4 className="font-semibold text-xs text-foreground flex items-center gap-2">
-            <Layers className="w-4 h-4 text-indigo-500" />
+            <Layers className="w-4 h-4 text-primary-500" />
             Unit Economics & Costs
           </h4>
 
@@ -186,7 +186,7 @@ export function MarginDashboard() {
               <span className="text-muted-foreground">Avg Cost / Paid User / Month:</span>
               <span
                 className={`font-semibold ${
-                  data.margin_alert ? "text-red-500" : "text-emerald-500"
+                  data.margin_alert ? "text-danger-500" : "text-success-500"
                 }`}
               >
                 ${data.avg_cost_per_paid_user_month.toFixed(4)}
@@ -202,7 +202,7 @@ export function MarginDashboard() {
 
             <div className="flex items-center justify-between p-3 rounded-xl border border-border bg-secondary/40">
               <span className="text-muted-foreground">Thinking Requests Today:</span>
-              <span className="font-semibold text-purple-500">
+              <span className="font-semibold text-primary-500">
                 {data.thinking_requests_today} calls
               </span>
             </div>
@@ -212,7 +212,7 @@ export function MarginDashboard() {
         {/* Avg Cost per Profile Chart / List */}
         <div className="p-6 rounded-2xl glass-card border border-border space-y-4">
           <h4 className="font-semibold text-xs text-foreground flex items-center gap-2">
-            <Percent className="w-4 h-4 text-purple-500" />
+            <Percent className="w-4 h-4 text-primary-500" />
             Avg Cost per Query by Profile
           </h4>
 
@@ -220,7 +220,7 @@ export function MarginDashboard() {
             <div className="p-4 rounded-xl border border-border bg-secondary/30 space-y-2">
               <div className="flex justify-between font-medium">
                 <span className="text-foreground">Free Tier Queries:</span>
-                <span className="text-emerald-500 font-bold">$0.000000</span>
+                <span className="text-success-500 font-bold">$0.000000</span>
               </div>
               <p className="text-[11px] text-muted-foreground leading-relaxed">
                 Free queries are strictly routed to free-tier projects (GEMINI_API_KEY_FREE) or local embeddings, generating $0 billing cost.
@@ -230,7 +230,7 @@ export function MarginDashboard() {
             <div className="p-4 rounded-xl border border-border bg-secondary/30 space-y-2">
               <div className="flex justify-between font-medium">
                 <span className="text-foreground">Paid Tier Queries:</span>
-                <span className="text-indigo-500 font-bold font-mono">
+                <span className="text-primary-500 font-bold font-mono">
                   ${(data.avg_cost_per_profile["paid"] || 0.00045).toFixed(6)} / req
                 </span>
               </div>

@@ -137,19 +137,19 @@ export function SettingsEditor() {
           <div className="p-5 rounded-xl border border-border bg-secondary/30 flex items-center justify-between">
             <div className="space-y-1">
               <span className="text-xs font-bold text-foreground flex items-center gap-1.5">
-                <Sparkles className="w-4 h-4 text-purple-500" />
+                <Sparkles className="w-4 h-4 text-primary-500" />
                 PREMIUM_ENABLED
               </span>
               <p className="text-[11px] text-muted-foreground max-w-xs">
-                Master switch for Gemini Flash Thinking route. When disabled, paid users seamlessly answer via normal paid chain.
+                Master switch for Gemini Flash Thinking route. When disabled, paid users answer through the normal paid chain without interruption.
               </p>
             </div>
 
             <button
               onClick={() => handleTogglePremium(!premiumEnabled)}
-              className={`px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all shadow-sm ${
+              className={`px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-sm ${
                 premiumEnabled
-                  ? "bg-purple-600 text-white hover:bg-purple-700"
+                  ? "bg-primary-600 text-white hover:bg-primary-700"
                   : "bg-secondary text-muted-foreground hover:text-foreground border border-border"
               }`}
             >
@@ -162,7 +162,7 @@ export function SettingsEditor() {
           <div className="p-5 rounded-xl border border-border bg-secondary/30 flex items-center justify-between">
             <div className="space-y-1">
               <span className="text-xs font-bold text-foreground flex items-center gap-1.5">
-                <ShieldAlert className="w-4 h-4 text-amber-500" />
+                <ShieldAlert className="w-4 h-4 text-primary-500" />
                 Exam Week Mode (Retrieval-Only)
               </span>
               <p className="text-[11px] text-muted-foreground max-w-xs">
@@ -172,9 +172,9 @@ export function SettingsEditor() {
 
             <button
               onClick={() => handleToggleManualRetrieval(!manualRetrieval)}
-              className={`px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all shadow-sm ${
+              className={`px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-sm ${
                 manualRetrieval
-                  ? "bg-amber-600 text-white hover:bg-amber-700"
+                  ? "bg-primary-600 text-white hover:bg-primary-700"
                   : "bg-secondary text-muted-foreground hover:text-foreground border border-border"
               }`}
             >
@@ -189,7 +189,7 @@ export function SettingsEditor() {
       <div className="p-6 rounded-2xl glass-card border border-border space-y-5">
         <div className="flex items-center justify-between border-b border-border pb-4">
           <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center">
+            <div className="w-9 h-9 rounded-xl bg-success-500/10 text-success-500 flex items-center justify-center">
               <Coins className="w-5 h-5" />
             </div>
             <div>
@@ -207,7 +207,7 @@ export function SettingsEditor() {
               Current Reconciled Balance (USD)
             </label>
             <div className="relative">
-              <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground font-mono text-sm">
+              <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground $PLACEHOLDER text-sm">
                 $
               </span>
               <input
@@ -217,7 +217,7 @@ export function SettingsEditor() {
                 value={newBalanceInput}
                 onChange={(e) => setNewBalanceInput(e.target.value)}
                 required
-                className="w-full pl-8 pr-4 py-2.5 rounded-xl border border-border bg-background text-foreground text-sm font-mono font-bold focus:outline-none focus:ring-2 focus:ring-primary"
+                className="w-full pl-8 pr-4 py-2.5 rounded-xl border border-border bg-background text-foreground text-sm $PLACEHOLDER font-bold focus:outline-none focus:ring-2 focus:ring-primary"
               />
             </div>
           </div>
@@ -226,7 +226,7 @@ export function SettingsEditor() {
             <button
               type="submit"
               disabled={saving}
-              className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-primary text-primary-foreground text-xs font-semibold hover:bg-primary/90 transition-all shadow-md shadow-primary/20"
+              className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-primary text-primary-foreground text-xs font-semibold hover:bg-primary/90 transition-colors shadow-md shadow-primary/20"
             >
               {saveSuccess ? (
                 <>
@@ -243,16 +243,16 @@ export function SettingsEditor() {
 
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs pt-2">
           <div className="p-3 rounded-xl border border-border bg-secondary/30">
-            <span className="text-muted-foreground block text-[10px] uppercase font-bold">Thinking Cutoff</span>
-            <span className="font-semibold text-amber-500 font-mono">$2.00 threshold</span>
+            <span className="text-muted-foreground block text-[10px]  font-bold">Thinking Cutoff</span>
+            <span className="font-semibold text-primary-500">$2.00 threshold</span>
           </div>
           <div className="p-3 rounded-xl border border-border bg-secondary/30">
-            <span className="text-muted-foreground block text-[10px] uppercase font-bold">Emergency Cutoff</span>
-            <span className="font-semibold text-red-500 font-mono">$0.75 threshold</span>
+            <span className="text-muted-foreground block text-[10px]  font-bold">Emergency Cutoff</span>
+            <span className="font-semibold text-danger-500">$0.75 threshold</span>
           </div>
           <div className="p-3 rounded-xl border border-border bg-secondary/30 col-span-2 sm:col-span-1">
-            <span className="text-muted-foreground block text-[10px] uppercase font-bold">Daily Spend Cap</span>
-            <span className="font-semibold text-foreground font-mono">$0.15 / day</span>
+            <span className="text-muted-foreground block text-[10px]  font-bold">Daily Spend Cap</span>
+            <span className="font-semibold text-foreground $PLACEHOLDER">$0.15 / day</span>
           </div>
         </div>
       </div>
@@ -261,7 +261,7 @@ export function SettingsEditor() {
       <div className="p-6 rounded-2xl glass-card border border-border space-y-5">
         <div className="flex items-center justify-between border-b border-border pb-4">
           <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-indigo-500/10 text-indigo-500 flex items-center justify-center">
+            <div className="w-9 h-9 rounded-xl bg-primary-500/10 text-primary-500 flex items-center justify-center">
               <DollarSign className="w-5 h-5" />
             </div>
             <div>
@@ -275,7 +275,7 @@ export function SettingsEditor() {
           <button
             onClick={handleSavePrices}
             disabled={saving}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-primary text-primary-foreground text-xs font-semibold hover:bg-primary/90 transition-all shadow-sm"
+            className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-primary text-primary-foreground text-xs font-semibold hover:bg-primary/90 transition-colors shadow-sm"
           >
             {saveSuccess ? <Check className="w-3.5 h-3.5" /> : <Save className="w-3.5 h-3.5" />}
             Save Prices
@@ -301,14 +301,14 @@ export function SettingsEditor() {
               ) : (
                 Object.entries(modelPrices).map(([modelId, prices]) => (
                   <tr key={modelId} className="hover:bg-secondary/20">
-                    <td className="p-3 font-mono font-semibold text-foreground">{modelId}</td>
+                    <td className="p-3 $PLACEHOLDER font-semibold text-foreground">{modelId}</td>
                     <td className="p-3">
                       <input
                         type="number"
                         step="0.01"
                         value={prices.input}
                         onChange={(e) => handlePriceChange(modelId, "input", e.target.value)}
-                        className="w-24 px-2 py-1 rounded border border-border bg-background text-foreground font-mono"
+                        className="w-24 px-2 py-1 rounded border border-border bg-background text-foreground $PLACEHOLDER"
                       />
                     </td>
                     <td className="p-3">
@@ -317,7 +317,7 @@ export function SettingsEditor() {
                         step="0.01"
                         value={prices.output}
                         onChange={(e) => handlePriceChange(modelId, "output", e.target.value)}
-                        className="w-24 px-2 py-1 rounded border border-border bg-background text-foreground font-mono"
+                        className="w-24 px-2 py-1 rounded border border-border bg-background text-foreground $PLACEHOLDER"
                       />
                     </td>
                   </tr>

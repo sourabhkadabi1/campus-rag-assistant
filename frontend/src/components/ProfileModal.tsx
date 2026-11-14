@@ -60,8 +60,8 @@ export function ProfileModal() {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-150">
-      <div className="relative w-full max-w-lg rounded-2xl glass-card border border-border shadow-2xl overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 animate-in fade-in duration-150">
+      <div className="relative w-full max-w-lg rounded-2xl glass-card overflow-hidden overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between p-5 border-b border-border bg-card/90">
           <div className="flex items-center gap-3">
@@ -108,7 +108,7 @@ export function ProfileModal() {
                 value={rollNo}
                 onChange={(e) => setRollNo(e.target.value)}
                 required
-                className="w-full px-3 py-2 rounded-xl border border-border bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary font-mono uppercase"
+                className="w-full px-3 py-2 rounded-xl border border-border bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary font-mono "
               />
             </div>
           </div>
@@ -164,14 +164,14 @@ export function ProfileModal() {
 
           {/* Role and Plan Test Switches */}
           <div className="pt-3 border-t border-border space-y-3">
-            <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider block">
+            <span className="text-[11px] font-bold text-muted-foreground   block">
               Account Role & Access
             </span>
 
             <div className="p-3 rounded-xl border border-border bg-secondary/40 space-y-2.5">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <Shield className="w-4 h-4 text-emerald-500" />
+                  <Shield className="w-4 h-4 text-success-500" />
                   <div>
                     <span className="text-xs font-semibold text-foreground block">
                       Current Role
@@ -186,9 +186,9 @@ export function ProfileModal() {
 
                 <div className="flex items-center gap-2">
                   <span
-                    className={`text-[10px] uppercase font-bold px-2.5 py-0.5 rounded-full ${
+                    className={`text-[10px]  font-bold px-2.5 py-0.5 rounded-full ${
                       role === "admin"
-                        ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20"
+                        ? "bg-success-500/10 text-success-500 border border-success-500/20"
                         : "bg-primary/10 text-primary border border-primary/20"
                     }`}
                   >
@@ -199,7 +199,7 @@ export function ProfileModal() {
                     <button
                       type="button"
                       onClick={() => setRole("student")}
-                      className="text-[11px] text-muted-foreground hover:text-red-500 underline ml-1"
+                      className="text-[11px] text-muted-foreground hover:text-danger-500 underline ml-1"
                     >
                       Exit Admin
                     </button>
@@ -229,19 +229,19 @@ export function ProfileModal() {
                         setAdminPasskey(e.target.value);
                         setAdminKeyError(false);
                       }}
-                      placeholder="Enter passkey..."
+                      placeholder="Enter passkey…"
                       className="flex-1 px-3 py-1.5 rounded-lg border border-border bg-background text-foreground text-xs font-mono"
                     />
                     <button
                       type="button"
                       onClick={handleVerifyAdmin}
-                      className="px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-700"
+                      className="px-3 py-1.5 rounded-lg bg-success-600 text-white text-xs font-semibold hover:bg-success-700"
                     >
                       Verify
                     </button>
                   </div>
                   {adminKeyError && (
-                    <p className="text-[10px] text-red-500">
+                    <p className="text-[10px] text-danger-500">
                       Invalid passkey. Access restricted to administrator.
                     </p>
                   )}
@@ -251,7 +251,7 @@ export function ProfileModal() {
 
             <div className="flex items-center justify-between p-3 rounded-xl border border-border bg-secondary/40">
               <div className="flex items-center gap-2">
-                <GraduationCap className="w-4 h-4 text-amber-500" />
+                <GraduationCap className="w-4 h-4 text-primary-500" />
                 <div>
                   <span className="text-xs font-semibold text-foreground block">
                     Subscription Tier
@@ -268,7 +268,7 @@ export function ProfileModal() {
                   onChange={(e) => setIsPaid(e.target.checked)}
                   className="sr-only peer"
                 />
-                <div className="w-11 h-6 bg-border peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-500"></div>
+                <div className="w-11 h-6 bg-border peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-border after:border after:rounded-full after:h-5 after:w-5 after:transition-colors peer-checked:bg-primary-500"></div>
               </label>
             </div>
           </div>

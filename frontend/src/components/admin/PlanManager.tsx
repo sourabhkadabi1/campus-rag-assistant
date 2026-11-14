@@ -68,7 +68,7 @@ export function PlanManager() {
       <div className="p-6 rounded-2xl glass-card border border-border space-y-5">
         <div className="flex items-center justify-between border-b border-border pb-4">
           <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-indigo-500/10 text-indigo-500 flex items-center justify-center">
+            <div className="w-9 h-9 rounded-xl bg-primary-500/10 text-primary-500 flex items-center justify-center">
               <CreditCard className="w-5 h-5" />
             </div>
             <div>
@@ -92,28 +92,28 @@ export function PlanManager() {
           {plans.map((plan) => (
             <div
               key={plan.id}
-              className={`p-5 rounded-2xl border space-y-3 ${
+              className={`p-5 space-y-3 ${
                 plan.name === "paid"
-                  ? "bg-gradient-to-tr from-primary/10 via-card to-card border-primary/40 shadow-sm"
-                  : "bg-card/60 border-border"
+                  ? "bg-secondary"
+                  : "bg-transparent"
               }`}
             >
               <div className="flex items-center justify-between">
                 <div>
                   <h4 className="font-bold text-sm text-foreground flex items-center gap-1.5">
                     {plan.display_name} Plan
-                    {plan.name === "paid" && <Sparkles className="w-3.5 h-3.5 text-amber-500" />}
+                    {plan.name === "paid" && <Sparkles className="w-3.5 h-3.5 text-primary-500" />}
                   </h4>
-                  <span className="text-[10px] text-muted-foreground uppercase font-bold">
+                  <span className="text-[10px] text-muted-foreground  font-bold">
                     Identifier: {plan.name}
                   </span>
                 </div>
 
                 <span
-                  className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase ${
+                  className={`text-[10px] font-bold px-2 py-0.5 rounded-full  ${
                     plan.is_default
                       ? "bg-secondary text-muted-foreground border border-border"
-                      : "bg-amber-500/10 text-amber-500 border border-amber-500/20"
+                      : "bg-primary-500/10 text-primary-500 border border-primary-500/20"
                   }`}
                 >
                   {plan.is_default ? "Default" : "Premium"}
@@ -123,19 +123,19 @@ export function PlanManager() {
               <div className="pt-2 border-t border-border space-y-1.5 text-xs">
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Question Units:</span>
-                  <span className="font-semibold text-foreground font-mono">
+                  <span className="font-semibold text-foreground">
                     {plan.requests_per_day} units / day
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Token Limit:</span>
-                  <span className="font-semibold text-foreground font-mono">
+                  <span className="font-semibold text-foreground">
                     {plan.tokens_per_day.toLocaleString()} tokens / day
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Thinking Reasoning:</span>
-                  <span className="font-semibold text-purple-500 font-mono">
+                  <span className="font-semibold text-primary-500">
                     {plan.thinking_credits_per_day ?? (plan.name === "paid" ? 1 : 0)} credit / day
                   </span>
                 </div>
@@ -154,7 +154,7 @@ export function PlanManager() {
       {/* Manual Plan Grant Tool */}
       <div className="p-6 rounded-2xl glass-card border border-border space-y-5">
         <div className="flex items-center gap-2.5 border-b border-border pb-4">
-          <div className="w-9 h-9 rounded-xl bg-purple-500/10 text-purple-500 flex items-center justify-center">
+          <div className="w-9 h-9 rounded-xl bg-primary-500/10 text-primary-500 flex items-center justify-center">
             <UserCheck className="w-5 h-5" />
           </div>
           <div>
@@ -176,7 +176,7 @@ export function PlanManager() {
               placeholder="student-pesu-001&#10;user-uuid-1234&#10;PES2UG23CS001"
               rows={3}
               required
-              className="w-full px-3 py-2 rounded-xl border border-border bg-background text-foreground text-xs font-mono focus:outline-none focus:ring-2 focus:ring-primary"
+              className="w-full px-3 py-2 rounded-xl border border-border bg-background text-foreground text-xs focus:outline-none focus:ring-2 focus:ring-primary"
             />
           </div>
 
@@ -202,7 +202,7 @@ export function PlanManager() {
                 min={1}
                 max={365}
                 required
-                className="w-full px-3 py-2 rounded-xl border border-border bg-background text-foreground font-mono"
+                className="w-full px-3 py-2 rounded-xl border border-border bg-background text-foreground"
               />
             </div>
           </div>
@@ -211,11 +211,11 @@ export function PlanManager() {
             <button
               type="submit"
               disabled={granting || !grantUserIds.trim()}
-              className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-primary text-primary-foreground text-xs font-semibold hover:bg-primary/90 disabled:opacity-50 transition-all shadow-md shadow-primary/20"
+              className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-primary text-primary-foreground text-xs font-semibold hover:bg-primary/90 disabled:opacity-50 transition-colors shadow-md shadow-primary/20"
             >
               {granting ? (
                 <>
-                  <RefreshCw className="w-3.5 h-3.5 animate-spin" /> Granting Access...
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin" /> Granting access…
                 </>
               ) : (
                 <>
@@ -227,7 +227,7 @@ export function PlanManager() {
         </form>
 
         {grantResult && (
-          <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs space-y-1">
+          <div className="p-4 rounded-xl bg-success-500/10 border border-success-500/20 text-success-600 dark:text-success-400 text-xs space-y-1">
             <div className="font-bold flex items-center gap-1.5">
               <Check className="w-4 h-4" /> Granted to {grantResult.granted} user(s)!
             </div>
