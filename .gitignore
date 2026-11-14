@@ -1,9 +1,13 @@
 # Environment
 .env
+.env*.local
+*.env
 
 # Node / Next.js
 node_modules/
 .next/
+out/
+build/
 
 # Project data
 PROJECT.md
