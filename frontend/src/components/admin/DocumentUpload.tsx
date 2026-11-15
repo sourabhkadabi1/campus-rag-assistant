@@ -28,7 +28,7 @@ import {
 } from "lucide-react";
 
 const DEPARTMENTS = ["All", "CSE", "ECE", "EEE", "ME", "AIML", "BT"];
-const DOC_TYPES = ["syllabus", "book", "notes", "previous_paper"];
+const DOC_TYPES = ["slides_pdf", "book", "notes", "previous_paper"];
 
 export function DocumentUpload() {
   const { profile } = useApp();

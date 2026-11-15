@@ -72,7 +72,7 @@ export interface DocumentItem {
   semester: number;
   subject: string;
   academic_year: string;
-  doc_type: "syllabus" | "book" | "notes" | "previous_paper";
+  doc_type: "syllabus" | "book" | "notes" | "previous_paper" | "slides_pdf";
   is_active: boolean;
   file_size_bytes: number;
   total_pages: number | null;

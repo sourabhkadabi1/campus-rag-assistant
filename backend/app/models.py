@@ -18,6 +18,7 @@ from pydantic import BaseModel, Field
 class DocType(str, Enum):
     """Allowed document types."""
     SYLLABUS = "syllabus"
+    SLIDES_PDF = "slides_pdf"
     BOOK = "book"
     NOTES = "notes"
     PREVIOUS_PAPER = "previous_paper"
