@@ -1,5 +1,5 @@
-/* Hallmark · shape: app screen · genre: modern-minimal · theme: Console (by request) · redesign: full · scope: app · signature: cited answers grounded in course material · console: light paper and graphite */
-/* Hallmark · pre-emit critique: P4 H4 E4 S4 R3 V4 · weakest: E, replaced warm print surfaces with a calm, dual-mode instrument workspace */
+/* Hallmark · shape: app screen · genre: modern-minimal · theme: Console (by request) · redesign: full · scope: app · signature: cited answers grounded in course material · console: monochrome night */
+/* Hallmark · pre-emit critique: P4 H4 E4 S4 R3 V4 · weakest: P, a near-black ground and charcoal surfaces match the requested ChatGPT reference */
 @import "katex/dist/katex.min.css";
 @import "./tokens.css";
 @import "./base.css" layer(base);
@@ -45,19 +45,21 @@ svg { flex-shrink: 0; }
 header.sticky { background: color-mix(in oklab, var(--color-paper) 94%, transparent); border-bottom: 1px solid var(--color-rule); backdrop-filter: blur(12px); }
 header a:first-child > div:first-child { background: var(--color-accent-soft); color: var(--color-accent); }
 header nav a[aria-current="page"], header nav a:hover { color: var(--color-accent); }
-aside { background: var(--color-paper-2) !important; border-color: var(--color-rule) !important; }
+aside { background: var(--color-paper) !important; border-color: var(--color-rule) !important; }
 aside button, aside a { min-height: 40px; }
 button { border-radius: var(--radius-control); transition: color var(--dur-short) var(--ease-out), background-color var(--dur-short) var(--ease-out), border-color var(--dur-short) var(--ease-out); }
 button:disabled { opacity: .55; cursor: not-allowed; }
 button:active { transform: translateY(1px); }
 button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
-button.bg-primary, button[class*="bg-gradient-to-r"] { background: var(--color-accent) !important; color: var(--color-accent-ink) !important; border: 1px solid var(--color-accent); }
-button.bg-primary:hover, button[class*="bg-gradient-to-r"]:hover { filter: brightness(.96); }
+button.bg-primary, button[class*="bg-gradient-to-r"] { background: var(--color-paper-3) !important; color: var(--color-ink) !important; border: 1px solid var(--color-rule); }
+button.bg-primary:hover, button[class*="bg-gradient-to-r"]:hover { background: var(--color-paper-2) !important; }
 input, select, textarea { background-color: var(--color-paper) !important; color: var(--color-ink) !important; border-color: var(--color-rule-2) !important; border-radius: var(--radius-control) !important; }
 input::placeholder, textarea::placeholder { color: var(--color-muted); }
 form, section, [role="tabpanel"] { min-width: 0; }
 
 .study-app { min-height: calc(100vh - 4rem); background: var(--color-paper); }
+.study-app aside button.bg-primary { background: var(--color-paper-3) !important; color: var(--color-ink) !important; border-color: transparent; }
+.study-chat .bg-primary.text-primary-foreground:not(button) { background: var(--color-paper-2); color: var(--color-ink); border: 1px solid var(--color-rule); }
 .study-chat { min-width: 0; background: var(--color-paper); }
 .study-home { width: min(100%, 960px); align-self: center; }
 .study-mark { margin-bottom: var(--space-lg); border-radius: 16px; color: var(--color-accent); background: var(--color-accent-soft); }

@@ -7,8 +7,6 @@ import { fetchQuotaRemaining } from "./api";
 interface AppContextType {
   profile: StudentProfile;
   setProfile: (p: StudentProfile) => void;
-  isDarkMode: boolean;
-  toggleDarkMode: () => void;
   quota: QuotaRemaining | null;
   refreshQuota: () => Promise<void>;
   isProfileModalOpen: boolean;
@@ -36,7 +34,6 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfileState] = useState<StudentProfile>(DEFAULT_PROFILE);
-  const [isDarkMode, setIsDarkMode] = useState<boolean>(false);
   const [quota, setQuota] = useState<QuotaRemaining | null>(null);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState<boolean>(false);
   const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState<boolean>(false);
@@ -45,30 +42,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     isOpen: boolean;
   } | null>(null);
 
-  // Load profile & theme from localStorage
+  // Load the profile and keep the requested dark-only appearance.
   useEffect(() => {
     try {
       const savedProfile = localStorage.getItem("pesu_profile");
       if (savedProfile) {
         setProfileState(JSON.parse(savedProfile));
       }
-      const savedTheme = localStorage.getItem("pesu_theme");
-      if (savedTheme !== null) {
-        const dark = savedTheme === "dark";
-        setIsDarkMode(dark);
-        if (dark) {
-          document.documentElement.classList.add("dark");
-          document.documentElement.classList.remove("light");
-        } else {
-          document.documentElement.classList.remove("dark");
-          document.documentElement.classList.add("light");
-        }
-      } else {
-        const dark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-        setIsDarkMode(dark);
-        document.documentElement.classList.toggle("dark", dark);
-        document.documentElement.classList.toggle("light", !dark);
-      }
+      localStorage.removeItem("pesu_theme");
+      document.documentElement.classList.add("dark");
+      document.documentElement.classList.remove("light");
     } catch (e) {
       console.warn("Storage access failed", e);
     }
@@ -79,23 +62,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     try {
       localStorage.setItem("pesu_profile", JSON.stringify(newProfile));
     } catch {}
-  };
-
-  const toggleDarkMode = () => {
-    setIsDarkMode((prev) => {
-      const next = !prev;
-      try {
-        localStorage.setItem("pesu_theme", next ? "dark" : "light");
-      } catch {}
-      if (next) {
-        document.documentElement.classList.add("dark");
-        document.documentElement.classList.remove("light");
-      } else {
-        document.documentElement.classList.remove("dark");
-        document.documentElement.classList.add("light");
-      }
-      return next;
-    });
   };
 
   const refreshQuota = async () => {
@@ -126,8 +92,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       value={{
         profile,
         setProfile,
-        isDarkMode,
-        toggleDarkMode,
         quota,
         refreshQuota,
         isProfileModalOpen,

@@ -10,15 +10,12 @@ import {
   MessageSquare,
   Sparkles,
   Shield,
-  Sun,
-  Moon,
-  User,
   BadgeCheck,
 } from "lucide-react";
 
 export function Header() {
   const pathname = usePathname();
-  const { profile, isDarkMode, toggleDarkMode, setIsProfileModalOpen, setIsUpgradeModalOpen } =
+  const { profile, setIsProfileModalOpen, setIsUpgradeModalOpen } =
     useApp();
 
   return (
@@ -92,15 +89,6 @@ export function Header() {
         <div className="flex items-center gap-2.5">
           {/* Quota Badge */}
           <QuotaBadge />
-
-          {/* Theme Toggle */}
-          <button
-            onClick={toggleDarkMode}
-            aria-label="Toggle theme"
-            className="p-2 rounded-xl text-muted-foreground hover:text-foreground hover:bg-secondary border border-transparent hover:border-border transition-colors"
-          >
-            {isDarkMode ? <Sun className="w-4 h-4 text-primary-400" /> : <Moon className="w-4 h-4 text-code-700" />}
-          </button>
 
           {/* Profile Button */}
           <button
