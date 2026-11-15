@@ -94,6 +94,8 @@ form, section, [role="tabpanel"] { min-width: 0; }
 .pricing-switch-option[aria-pressed="true"] { background: var(--color-paper-3); color: var(--color-ink); }
 .pricing-premium-action { background: var(--color-pricing-action); color: var(--color-pricing-action-ink); }
 .pricing-premium-action:hover { background: var(--color-pricing-action-hover); }
+.upgrade-checkout-button { background: var(--color-pricing-action); color: var(--color-pricing-action-ink); }
+.upgrade-checkout-button:hover { background: var(--color-pricing-action-hover); }
 .pricing-heading h1 { max-width: 13ch; font-size: clamp(2.5rem, 5vw, 4.25rem); line-height: 1.02; }
 .pricing-page > div.grid { gap: 1.25rem; }
 .pricing-page > div.grid > div { border: 1px solid var(--color-rule); border-radius: var(--radius-card); background: var(--color-paper-2); padding: clamp(1.25rem, 3vw, 2rem); box-shadow: none; }

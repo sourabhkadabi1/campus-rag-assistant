@@ -32,12 +32,17 @@ export function UpgradeModal() {
           description: `Premium Plan (${selectedDuration === "monthly" ? "₹99 / month" : "₹449 / semester"})`,
           order_id: order.order_id,
           handler: async function (response: any) {
-            await verifyPayment({
-              razorpay_order_id: response.razorpay_order_id,
-              razorpay_payment_id: response.razorpay_payment_id,
-              razorpay_signature: response.razorpay_signature,
-            });
-            completeUpgrade();
+            try {
+              await verifyPayment({
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_signature: response.razorpay_signature,
+              });
+              completeUpgrade();
+            } catch (err: any) {
+              setErrorMsg(err?.message || "Payment verification failed. Contact support before retrying.");
+              setLoading(false);
+            }
           },
           prefill: {
             name: profile.full_name,
@@ -53,12 +58,12 @@ export function UpgradeModal() {
         return;
       }
 
-      // If Razorpay JS SDK is not loaded or for dev sandbox simulation:
-      completeUpgrade();
+      setErrorMsg("Secure payment checkout is unavailable. Please try again later.");
+      setLoading(false);
     } catch (err: any) {
-      console.warn("Payment order creation failed, offering instant test activation:", err);
-      // Seamlessly allow instant test activation
-      completeUpgrade();
+      console.warn("Payment order creation failed:", err);
+      setErrorMsg(err?.message || "Could not start payment checkout.");
+      setLoading(false);
     }
   };
 
@@ -254,7 +259,7 @@ export function UpgradeModal() {
               <button
                 onClick={handleCheckout}
                 disabled={loading || success}
-                className="w-full py-3 whitespace-nowrap rounded-xl font-semibold text-xs text-white bg-secondary    hover:opacity-95 transition-colors shadow-md shadow-primary-500/25 flex items-center justify-center gap-2"
+                className="upgrade-checkout-button w-full py-3 whitespace-nowrap rounded-xl font-semibold text-xs hover:opacity-95 transition-colors flex items-center justify-center gap-2"
               >
                 {success ? (
                   <>
@@ -268,6 +273,7 @@ export function UpgradeModal() {
                   </>
                 )}
               </button>
+              {errorMsg && <p role="alert" className="mt-2 text-center text-xs text-danger-500">{errorMsg}</p>}
 
               <div className="mt-2 text-center text-[10px] text-muted-foreground flex items-center justify-center gap-1">
                 <ShieldCheck className="w-3.5 h-3.5 text-success-500" />

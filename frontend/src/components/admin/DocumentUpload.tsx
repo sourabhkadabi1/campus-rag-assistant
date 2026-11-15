@@ -247,7 +247,7 @@ export function DocumentUpload() {
               >
                 {DOC_TYPES.map((t) => (
                   <option key={t} value={t}>
-                    {t.replace("_", " ")}
+                    {t === "slides_pdf" ? "Slides PDF" : t.replace("_", " ")}
                   </option>
                 ))}
               </select>

@@ -66,13 +66,19 @@ async def _call_gemini(model: str, prompt: str) -> Optional[str]:
         "generationConfig": {"maxOutputTokens": 1024, "temperature": 0.3},
     }
 
-    async with httpx.AsyncClient(timeout=60.0) as client:
-        resp = await client.post(
-            url,
-            json=payload,
-            headers={"Content-Type": "application/json"},
-            params={"key": settings.gemini_api_key},
-        )
+    try:
+        async with httpx.AsyncClient(timeout=httpx.Timeout(30.0, connect=10.0)) as client:
+            resp = await client.post(
+                url, json=payload,
+                headers={"Content-Type": "application/json"},
+                params={"key": settings.gemini_api_key},
+            )
+    except httpx.TimeoutException as exc:
+        logger.warning("Gemini %s summary timed out: %s", model, exc)
+        return None
+    except httpx.HTTPError as exc:
+        logger.warning("Gemini %s summary request failed: %s", model, exc)
+        return None
 
     if resp.status_code == 429:
         logger.warning("429 rate-limited on %s for summary", model)
