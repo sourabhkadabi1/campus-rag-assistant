@@ -1,7 +1,7 @@
 """
 Answer cache — normalised question hash, lookup, store, TTL.
 
-Cache key = SHA-256(normalised_question | semester | subject | academic_year).
+Cache key = SHA-256(normalised_question | semester | department | subject | academic_year).
 Cache hits never consume student quota.
 """
 
@@ -60,10 +60,13 @@ def make_cache_key(
     subject: Optional[str],
     semester: int,
     academic_year: Optional[str] = None,
+    department: Optional[str] = None,
 ) -> str:
     """Generate a deterministic cache key from question + context."""
     normalised = normalize_question(question)
     parts = [normalised, str(semester)]
+    if department:
+        parts.append(department.upper().strip())
     if subject:
         parts.append(subject.lower().strip())
     if academic_year:

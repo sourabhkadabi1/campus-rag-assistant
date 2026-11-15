@@ -7,6 +7,7 @@
   --ease-out: cubic-bezier(.16,1,.3,1); --ease-in: cubic-bezier(.7,0,.84,0); --dur-micro: 120ms; --dur-short: 220ms;
   --container: 1440px; --gutter: 40px; --gap-columns: 24px;
   --color-paper: oklch(11% .003 250); --color-paper-2: oklch(16% .004 250); --color-paper-3: oklch(20% .005 250);
+  --color-pricing-action: oklch(66% .19 250); --color-pricing-action-hover: oklch(61% .2 250); --color-pricing-action-ink: oklch(12% .015 250);
   --color-ink: oklch(94% .003 250); --color-ink-2: oklch(84% .004 250); --color-muted: oklch(70% .006 250);
   --color-rule: oklch(25% .005 250); --color-rule-2: oklch(36% .006 250);
   --color-accent: oklch(92% .003 250); --color-accent-ink: oklch(13% .003 250); --color-accent-soft: oklch(22% .005 250); --color-focus: oklch(91% .004 250);

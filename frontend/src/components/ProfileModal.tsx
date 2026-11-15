@@ -1,11 +1,11 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useApp } from "@/lib/context";
-import { X, User, GraduationCap, Shield, Save, Check, RefreshCw } from "lucide-react";
+import { X, User, GraduationCap, Save, Check, RefreshCw } from "lucide-react";
 
-const DEPARTMENTS = ["CSE", "ECE", "EEE", "ME", "AIML", "BT"];
-const SEMESTERS = [1, 2, 3, 4, 5, 6, 7, 8];
+const DEPARTMENTS = ["CSE", "AIML"];
+const SEMESTERS = [3, 4];
 
 export function ProfileModal() {
   const { profile, setProfile, isProfileModalOpen, setIsProfileModalOpen, refreshQuota } = useApp();
@@ -15,25 +15,18 @@ export function ProfileModal() {
   const [rollNo, setRollNo] = useState(profile.roll_no);
   const [department, setDepartment] = useState(profile.department);
   const [semester, setSemester] = useState(profile.semester);
-  const [role, setRole] = useState(profile.role);
   const [isPaid, setIsPaid] = useState(profile.is_paid);
   const [savedSuccess, setSavedSuccess] = useState(false);
-  const [showAdminAuth, setShowAdminAuth] = useState(false);
-  const [adminPasskey, setAdminPasskey] = useState("");
-  const [adminKeyError, setAdminKeyError] = useState(false);
 
-  const EXPECTED_KEY = process.env.NEXT_PUBLIC_ADMIN_PASSKEY || "pesu-admin-2026";
-
-  const handleVerifyAdmin = () => {
-    if (adminPasskey.trim() === EXPECTED_KEY) {
-      setRole("admin");
-      setShowAdminAuth(false);
-      setAdminPasskey("");
-      setAdminKeyError(false);
-    } else {
-      setAdminKeyError(true);
-    }
-  };
+  useEffect(() => {
+    if (!isProfileModalOpen) return;
+    setFullName(profile.full_name);
+    setEmail(profile.email);
+    setRollNo(profile.roll_no);
+    setDepartment(profile.department);
+    setSemester(profile.semester);
+    setIsPaid(profile.is_paid);
+  }, [isProfileModalOpen, profile]);
 
   if (!isProfileModalOpen) return null;
 
@@ -46,7 +39,6 @@ export function ProfileModal() {
       roll_no: rollNo,
       department,
       semester,
-      role,
       is_paid: isPaid,
       plan_name: isPaid ? ("paid" as const) : ("free" as const),
     };
@@ -136,9 +128,12 @@ export function ProfileModal() {
                 onChange={(e) => setDepartment(e.target.value)}
                 className="w-full px-3 py-2 rounded-xl border border-border bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary"
               >
+                {!DEPARTMENTS.includes(department) && (
+                  <option value={department}>{department} (not supported yet)</option>
+                )}
                 {DEPARTMENTS.map((dept) => (
                   <option key={dept} value={dept}>
-                    {dept}
+                    {dept === "AIML" ? "AI-ML" : dept}
                   </option>
                 ))}
               </select>
@@ -153,6 +148,9 @@ export function ProfileModal() {
                 onChange={(e) => setSemester(Number(e.target.value))}
                 className="w-full px-3 py-2 rounded-xl border border-border bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary font-medium"
               >
+                {!SEMESTERS.includes(semester) && (
+                  <option value={semester}>Semester {semester} (not supported yet)</option>
+                )}
                 {SEMESTERS.map((sem) => (
                   <option key={sem} value={sem}>
                     Semester {sem}
@@ -162,93 +160,8 @@ export function ProfileModal() {
             </div>
           </div>
 
-          {/* Role and Plan Test Switches */}
+          {/* Subscription settings */}
           <div className="pt-3 border-t border-border space-y-3">
-            <span className="text-[11px] font-bold text-muted-foreground   block">
-              Account Role & Access
-            </span>
-
-            <div className="p-3 rounded-xl border border-border bg-secondary/40 space-y-2.5">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Shield className="w-4 h-4 text-success-500" />
-                  <div>
-                    <span className="text-xs font-semibold text-foreground block">
-                      Current Role
-                    </span>
-                    <span className="text-[11px] text-muted-foreground">
-                      {role === "admin"
-                        ? "Authorized System Administrator"
-                        : "Enrolled College Student"}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <span
-                    className={`text-[10px]  font-bold px-2.5 py-0.5 rounded-full ${
-                      role === "admin"
-                        ? "bg-success-500/10 text-success-500 border border-success-500/20"
-                        : "bg-primary/10 text-primary border border-primary/20"
-                    }`}
-                  >
-                    {role}
-                  </span>
-
-                  {role === "admin" ? (
-                    <button
-                      type="button"
-                      onClick={() => setRole("student")}
-                      className="text-[11px] text-muted-foreground hover:text-danger-500 underline ml-1"
-                    >
-                      Exit Admin
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => setShowAdminAuth(!showAdminAuth)}
-                      className="text-[11px] text-muted-foreground hover:text-primary underline ml-1"
-                    >
-                      {showAdminAuth ? "Cancel" : "Admin Login"}
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              {/* Admin passkey entry (only when Admin Login is clicked) */}
-              {showAdminAuth && role !== "admin" && (
-                <div className="pt-2 border-t border-border/60 space-y-2">
-                  <label className="block text-[11px] font-medium text-muted-foreground">
-                    Administrator Security Passkey
-                  </label>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="password"
-                      value={adminPasskey}
-                      onChange={(e) => {
-                        setAdminPasskey(e.target.value);
-                        setAdminKeyError(false);
-                      }}
-                      placeholder="Enter passkey…"
-                      className="flex-1 px-3 py-1.5 rounded-lg border border-border bg-background text-foreground text-xs font-mono"
-                    />
-                    <button
-                      type="button"
-                      onClick={handleVerifyAdmin}
-                      className="px-3 py-1.5 rounded-lg bg-success-600 text-white text-xs font-semibold hover:bg-success-700"
-                    >
-                      Verify
-                    </button>
-                  </div>
-                  {adminKeyError && (
-                    <p className="text-[10px] text-danger-500">
-                      Invalid passkey. Access restricted to administrator.
-                    </p>
-                  )}
-                </div>
-              )}
-            </div>
-
             <div className="flex items-center justify-between p-3 rounded-xl border border-border bg-secondary/40">
               <div className="flex items-center gap-2">
                 <GraduationCap className="w-4 h-4 text-primary-500" />
@@ -283,7 +196,6 @@ export function ProfileModal() {
                 setRollNo("PES2UG23CS001");
                 setDepartment("CSE");
                 setSemester(3);
-                setRole("student");
                 setIsPaid(false);
               }}
               className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1"

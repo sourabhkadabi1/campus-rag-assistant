@@ -8,10 +8,14 @@ from __future__ import annotations
 import json
 import logging
 import os
+import hashlib
+import hmac
+import time
 import uuid
 from pathlib import Path
 
-from fastapi import APIRouter, BackgroundTasks, File, Form, HTTPException, Request, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, Request, UploadFile
+from pydantic import BaseModel
 
 from app.config import DEFAULT_MODEL_PRICES, settings
 from app.database import execute, fetch, fetchrow, fetchval
@@ -27,7 +31,45 @@ from app.models import (
 from app.services.ingestion import ingest_document
 
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/admin", tags=["admin"])
+auth_router = APIRouter(prefix="/admin", tags=["admin-auth"])
+
+
+def _admin_token(timestamp: int) -> str:
+    payload = f"{settings.admin_username}:{timestamp}"
+    signature = hmac.new(settings.admin_password.encode(), payload.encode(), hashlib.sha256).hexdigest()
+    return f"{timestamp}.{signature}"
+
+
+async def require_admin(request: Request) -> None:
+    token = request.headers.get("Authorization", "").removeprefix("Bearer ")
+    try:
+        timestamp_text, signature = token.split(".", 1)
+        timestamp = int(timestamp_text)
+    except (ValueError, AttributeError):
+        raise HTTPException(401, "Administrator authentication required")
+    if not settings.admin_username or not settings.admin_password or abs(int(time.time()) - timestamp) > 8 * 60 * 60:
+        raise HTTPException(401, "Administrator session expired")
+    expected = _admin_token(timestamp).split(".", 1)[1]
+    if not hmac.compare_digest(signature, expected):
+        raise HTTPException(401, "Administrator authentication required")
+
+
+router = APIRouter(prefix="/admin", tags=["admin"], dependencies=[Depends(require_admin)])
+
+
+class AdminLoginRequest(BaseModel):
+    username: str
+    password: str
+
+
+@auth_router.post("/authenticate")
+async def authenticate_admin(body: AdminLoginRequest):
+    """Check administrator credentials configured on the backend only."""
+    username_ok = hmac.compare_digest(body.username, settings.admin_username)
+    password_ok = hmac.compare_digest(body.password, settings.admin_password)
+    if not settings.admin_username or not settings.admin_password or not (username_ok and password_ok):
+        raise HTTPException(401, "Invalid administrator username or password")
+    return {"authenticated": True, "token": _admin_token(int(time.time()))}
 
 
 # ── Upload ────────────────────────────────────────────────────────

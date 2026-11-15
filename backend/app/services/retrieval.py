@@ -206,7 +206,8 @@ async def hybrid_search(
 
     Returns ``(results, fallback_message)``.
     *fallback_message* is set when chapter-filtered search found nothing
-    and we retried across the whole semester.
+    and we retried without the chapter constraint, preserving branch,
+    semester, and subject scope.
     """
     # 1. Embed the query
     query_embedding = get_embedding(query)
@@ -230,19 +231,21 @@ async def hybrid_search(
 
     fallback_message: Optional[str] = None
 
-    # 4. Chapter fallback — retry across whole semester if nothing found
+    # 4. Chapter fallback — keep the chosen subject scope when retrying.
     if (
         not vec_results
         and not ft_results
-        and (chapter_no or chapters or subject)
+        and (chapter_no or chapters)
     ):
-        logger.info("Filtered search empty — retrying across whole semester")
+        logger.info("Filtered search empty — retrying without chapter filters")
         vec_results = await _vector_search(
             query_embedding, semester, department,
+            subject=subject,
             academic_year=academic_year, limit=limit * 3,
         )
         ft_results = await _fulltext_search(
             query, semester, department,
+            subject=subject,
             academic_year=academic_year, limit=limit * 3,
         )
 
@@ -251,9 +254,6 @@ async def hybrid_search(
             parts = []
             if chapter_no:
                 parts.append(f"not in Chapter {chapter_no}")
-            elif subject:
-                parts.append(f"not in {subject}")
-
             found_chapters: set[int] = set()
             for r in vec_results + ft_results:
                 if r.get("chapter_no"):

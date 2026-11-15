@@ -31,10 +31,11 @@ export default function PricingPage() {
 
         {/* Billing Switcher */}
         <div className="pt-2 flex justify-center">
-          <div className="flex items-center p-1 rounded-xl bg-secondary border border-border text-xs font-medium">
+          <div className="pricing-switcher flex items-center p-1 rounded-full bg-secondary border border-border text-xs font-medium" role="group" aria-label="Billing period">
             <button
               onClick={() => setBillingCycle("monthly")}
-              className={`px-4 py-2 rounded-lg transition-colors ${
+              aria-pressed={billingCycle === "monthly"}
+              className={`pricing-switch-option px-5 py-2.5 rounded-full transition-colors ${
                 billingCycle === "monthly"
                   ? "bg-background text-foreground shadow-sm font-semibold"
                   : "text-muted-foreground hover:text-foreground"
@@ -44,7 +45,8 @@ export default function PricingPage() {
             </button>
             <button
               onClick={() => setBillingCycle("semester")}
-              className={`flex items-center gap-1.5 px-4 py-2 rounded-lg transition-colors ${
+              aria-pressed={billingCycle === "semester"}
+              className={`pricing-switch-option flex items-center gap-1.5 px-5 py-2.5 rounded-full transition-colors ${
                 billingCycle === "semester"
                   ? "bg-background text-foreground shadow-sm font-semibold"
                   : "text-muted-foreground hover:text-foreground"
@@ -187,7 +189,7 @@ export default function PricingPage() {
           <div className="space-y-2">
             <button
               onClick={() => setIsUpgradeModalOpen(true)}
-              className="w-full py-3.5 rounded-2xl font-semibold text-xs text-white bg-secondary    hover:opacity-95 transition-colors shadow-lg shadow-primary-500/25 flex items-center justify-center gap-2"
+              className="pricing-premium-action w-full py-3.5 rounded-full font-semibold text-sm hover:opacity-95 transition-colors flex items-center justify-center gap-2"
             >
               {profile.is_paid ? "Active Subscription" : "Upgrade to Premium"}
               <ArrowRight className="w-4 h-4" />

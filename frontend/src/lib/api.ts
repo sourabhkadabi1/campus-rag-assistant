@@ -14,6 +14,28 @@ import {
 } from "./types";
 
 const BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
+let adminSessionToken = "";
+
+export async function authenticateAdmin(username: string, password: string): Promise<void> {
+  const response = await fetch(`${BASE_URL}/admin/authenticate`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ username, password }),
+  });
+  if (!response.ok) throw new Error("Invalid administrator username or password");
+  const data = await response.json();
+  adminSessionToken = data.token;
+}
+
+export function clearAdminSession(): void {
+  adminSessionToken = "";
+}
+
+function adminFetch(path: string, init: RequestInit = {}): Promise<Response> {
+  const headers = new Headers(init.headers);
+  if (adminSessionToken) headers.set("Authorization", `Bearer ${adminSessionToken}`);
+  return fetch(`${BASE_URL}${path}`, { ...init, headers });
+}
 
 function getHeaders(profile?: StudentProfile | null): Record<string, string> {
   const headers: Record<string, string> = {
@@ -61,6 +83,7 @@ export async function askQuestionStream(
     sessionId?: string;
     detailed?: boolean;
     thinking?: boolean;
+    subject?: string | null;
   },
   callbacks: StreamCallbacks,
   abortSignal?: AbortSignal
@@ -75,6 +98,7 @@ export async function askQuestionStream(
       session_id: options.sessionId,
       detailed: options.detailed ?? false,
       thinking: options.thinking ?? false,
+      subject: options.subject ?? null,
     }),
     signal: abortSignal,
   });
@@ -161,8 +185,9 @@ export async function fetchQuotaRemaining(
 ): Promise<QuotaRemaining> {
   const res = await fetch(`${BASE_URL}/quota/remaining`, {
     headers: getHeaders(profile),
+    signal: AbortSignal.timeout(8000),
   });
-  if (!res.ok) throw new Error("Failed to fetch quota");
+  if (!res.ok) throw new Error(`Failed to fetch student quota (${res.status})`);
   return res.json();
 }
 
@@ -203,6 +228,17 @@ export async function listChatSessions(
   });
   if (!res.ok) throw new Error("Failed to list chat sessions");
   return res.json();
+}
+
+export async function listAvailableSubjects(
+  profile: StudentProfile
+): Promise<string[]> {
+  const res = await fetch(`${BASE_URL}/subjects`, {
+    headers: getHeaders(profile),
+  });
+  if (!res.ok) throw new Error("Failed to load available subjects");
+  const data: { subjects: string[] } = await res.json();
+  return data.subjects;
 }
 
 export async function getSessionMessages(
@@ -272,7 +308,7 @@ export async function uploadDocument(
   const headers: Record<string, string> = {};
   if (profile) headers["X-User-Id"] = profile.id;
 
-  const res = await fetch(`${BASE_URL}/admin/documents/upload`, {
+  const res = await adminFetch(`/admin/documents/upload`, {
     method: "POST",
     headers,
     body: formData,
@@ -294,7 +330,7 @@ export async function listDocuments(filters?: {
   if (filters?.semester) params.append("semester", filters.semester.toString());
   if (filters?.subject) params.append("subject", filters.subject);
 
-  const res = await fetch(`${BASE_URL}/admin/documents?${params.toString()}`);
+  const res = await adminFetch(`/admin/documents?${params.toString()}`);
   if (!res.ok) throw new Error("Failed to list documents");
   return res.json();
 }
@@ -302,7 +338,7 @@ export async function listDocuments(filters?: {
 export async function getDocumentStatus(
   docId: string
 ): Promise<IngestionStatusDetail> {
-  const res = await fetch(`${BASE_URL}/admin/documents/${docId}/status`);
+  const res = await adminFetch(`/admin/documents/${docId}/status`);
   if (!res.ok) throw new Error("Failed to get ingestion status");
   return res.json();
 }
@@ -310,7 +346,7 @@ export async function getDocumentStatus(
 export async function getDocumentSummaries(
   docId: string
 ): Promise<ChapterSummary[]> {
-  const res = await fetch(`${BASE_URL}/admin/documents/${docId}/summaries`);
+  const res = await adminFetch(`/admin/documents/${docId}/summaries`);
   if (!res.ok) throw new Error("Failed to get chapter summaries");
   return res.json();
 }
@@ -319,8 +355,7 @@ export async function toggleDocumentActive(
   docId: string,
   isActive: boolean
 ): Promise<void> {
-  const res = await fetch(
-    `${BASE_URL}/admin/documents/${docId}/active?is_active=${isActive}`,
+  const res = await adminFetch(`/admin/documents/${docId}/active?is_active=${isActive}`,
     {
       method: "PATCH",
     }
@@ -329,14 +364,14 @@ export async function toggleDocumentActive(
 }
 
 export async function deleteDocument(docId: string): Promise<void> {
-  const res = await fetch(`${BASE_URL}/admin/documents/${docId}`, {
+  const res = await adminFetch(`/admin/documents/${docId}`, {
     method: "DELETE",
   });
   if (!res.ok) throw new Error("Failed to delete document");
 }
 
 export async function reingestDocument(docId: string): Promise<void> {
-  const res = await fetch(`${BASE_URL}/admin/documents/${docId}/reingest`, {
+  const res = await adminFetch(`/admin/documents/${docId}/reingest`, {
     method: "POST",
   });
   if (!res.ok) throw new Error("Failed to trigger re-ingestion");
@@ -347,7 +382,7 @@ export async function reingestDocument(docId: string): Promise<void> {
 // ─────────────────────────────────────────────────────────────
 
 export async function fetchAllModelStatus(): Promise<ModelStatus[]> {
-  const res = await fetch(`${BASE_URL}/admin/models/status`);
+  const res = await adminFetch(`/admin/models/status`);
   if (!res.ok) throw new Error("Failed to fetch model status");
   return res.json();
 }
@@ -356,8 +391,7 @@ export async function toggleModel(
   modelId: string,
   enabled?: boolean
 ): Promise<{ model_id: string; is_enabled: boolean }> {
-  const res = await fetch(
-    `${BASE_URL}/admin/models/${encodeURIComponent(modelId)}/toggle`,
+  const res = await adminFetch(`/admin/models/${encodeURIComponent(modelId)}/toggle`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -371,8 +405,7 @@ export async function toggleModel(
 export async function clearModelCooldown(
   modelId: string
 ): Promise<{ model_id: string; cooldown_cleared: boolean }> {
-  const res = await fetch(
-    `${BASE_URL}/admin/models/${encodeURIComponent(modelId)}/clear-cooldown`,
+  const res = await adminFetch(`/admin/models/${encodeURIComponent(modelId)}/clear-cooldown`,
     {
       method: "POST",
     }
@@ -382,7 +415,7 @@ export async function clearModelCooldown(
 }
 
 export async function reverifyModels(): Promise<any[]> {
-  const res = await fetch(`${BASE_URL}/admin/models/reverify`, {
+  const res = await adminFetch(`/admin/models/reverify`, {
     method: "POST",
   });
   if (!res.ok) throw new Error("Failed to re-verify models");
@@ -394,7 +427,7 @@ export async function reverifyModels(): Promise<any[]> {
 // ─────────────────────────────────────────────────────────────
 
 export async function fetchMarginDashboard(): Promise<MarginDashboardData> {
-  const res = await fetch(`${BASE_URL}/admin/margin`);
+  const res = await adminFetch(`/admin/margin`);
   if (!res.ok) throw new Error("Failed to fetch margin dashboard");
   return res.json();
 }
@@ -402,7 +435,7 @@ export async function fetchMarginDashboard(): Promise<MarginDashboardData> {
 export async function fetchAccountBalance(): Promise<{
   account_balance_usd: number;
 }> {
-  const res = await fetch(`${BASE_URL}/admin/settings/balance`);
+  const res = await adminFetch(`/admin/settings/balance`);
   if (!res.ok) throw new Error("Failed to fetch balance");
   return res.json();
 }
@@ -411,7 +444,7 @@ export async function updateAccountBalance(
   amount: number,
   adminId?: string
 ): Promise<{ account_balance_usd: number }> {
-  const res = await fetch(`${BASE_URL}/admin/settings/balance?amount=${amount}`, {
+  const res = await adminFetch(`/admin/settings/balance?amount=${amount}`, {
     method: "POST",
     headers: { "X-User-Id": adminId || "admin" },
   });
@@ -423,8 +456,7 @@ export async function togglePremiumSetting(
   enabled: boolean,
   adminId?: string
 ): Promise<{ premium_enabled: boolean }> {
-  const res = await fetch(
-    `${BASE_URL}/admin/settings/premium-toggle?enabled=${enabled}`,
+  const res = await adminFetch(`/admin/settings/premium-toggle?enabled=${enabled}`,
     {
       method: "POST",
       headers: { "X-User-Id": adminId || "admin" },
@@ -435,7 +467,7 @@ export async function togglePremiumSetting(
 }
 
 export async function fetchModelPrices(): Promise<{ prices: Record<string, any> }> {
-  const res = await fetch(`${BASE_URL}/admin/settings/model-prices`);
+  const res = await adminFetch(`/admin/settings/model-prices`);
   if (!res.ok) throw new Error("Failed to fetch model prices");
   return res.json();
 }
@@ -444,7 +476,7 @@ export async function updateModelPrices(
   prices: Record<string, { input: number; output: number }>,
   adminId?: string
 ): Promise<any> {
-  const res = await fetch(`${BASE_URL}/admin/settings/model-prices`, {
+  const res = await adminFetch(`/admin/settings/model-prices`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -457,7 +489,7 @@ export async function updateModelPrices(
 }
 
 export async function fetchBudgetGuardStatus(): Promise<BudgetGuardStatus> {
-  const res = await fetch(`${BASE_URL}/admin/budget-guard`);
+  const res = await adminFetch(`/admin/budget-guard`);
   if (!res.ok) throw new Error("Failed to fetch budget guard");
   return res.json();
 }
@@ -476,7 +508,7 @@ export async function updateBudgetGuard(
   if (settings.monthly_spend_cap_usd !== undefined)
     params.append("monthly_spend_cap_usd", settings.monthly_spend_cap_usd.toString());
 
-  const res = await fetch(`${BASE_URL}/admin/budget-guard?${params.toString()}`, {
+  const res = await adminFetch(`/admin/budget-guard?${params.toString()}`, {
     method: "POST",
     headers: { "X-User-Id": adminId || "admin" },
   });
@@ -499,7 +531,7 @@ export async function grantPlanManual(
   planName: string,
   durationDays = 30
 ): Promise<any> {
-  const res = await fetch(`${BASE_URL}/admin/plans/grant`, {
+  const res = await adminFetch(`/admin/plans/grant`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({

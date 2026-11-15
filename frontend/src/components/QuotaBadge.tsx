@@ -6,10 +6,22 @@ import { Sparkles, Zap, Clock, ShieldCheck, ArrowUpRight } from "lucide-react";
 import Link from "next/link";
 
 export function QuotaBadge() {
-  const { quota, profile, setIsUpgradeModalOpen } = useApp();
+  const { quota, quotaError, profile, refreshQuota, setIsUpgradeModalOpen } = useApp();
   const [showTooltip, setShowTooltip] = useState(false);
 
   if (!quota) {
+    if (quotaError) {
+      return (
+        <button
+          type="button"
+          onClick={() => void refreshQuota()}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-secondary text-xs text-muted-foreground hover:text-foreground"
+          title="Retry loading your daily student quota"
+        >
+          Quota unavailable, retry
+        </button>
+      );
+    }
     return (
       <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-secondary text-xs text-muted-foreground ">
         <Clock className="w-3.5 h-3.5" />

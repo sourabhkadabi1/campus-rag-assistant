@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import { useApp } from "@/lib/context";
+import { authenticateAdmin, clearAdminSession } from "@/lib/api";
 import { DocumentUpload } from "@/components/admin/DocumentUpload";
 import { ModelStatusPanel } from "@/components/admin/ModelStatusPanel";
 import { MarginDashboard } from "@/components/admin/MarginDashboard";
@@ -24,47 +25,41 @@ import {
 } from "lucide-react";
 
 export default function AdminPortalPage() {
-  const { profile, setProfile } = useApp();
+  const { isAdminAuthenticated, setIsAdminAuthenticated } = useApp();
   const [activeTab, setActiveTab] = useState<
     "documents" | "models" | "margin" | "settings" | "plans"
   >("documents");
 
-  // Admin passkey authentication state
-  const [passkeyInput, setPasskeyInput] = useState("");
+  const [usernameInput, setUsernameInput] = useState("");
+  const [passwordInput, setPasswordInput] = useState("");
   const [authError, setAuthError] = useState(false);
   const [authSuccess, setAuthSuccess] = useState(false);
 
-  const EXPECTED_KEY =
-    process.env.NEXT_PUBLIC_ADMIN_PASSKEY || "pesu-admin-2026";
-
-  const handleUnlockAdmin = (e: React.FormEvent) => {
+  const handleUnlockAdmin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (passkeyInput.trim() === EXPECTED_KEY) {
+    try {
+      await authenticateAdmin(usernameInput.trim(), passwordInput);
       setAuthSuccess(true);
       setAuthError(false);
       setTimeout(() => {
-        setProfile({
-          ...profile,
-          role: "admin",
-        });
-        setPasskeyInput("");
+        setIsAdminAuthenticated(true);
+        setUsernameInput("");
+        setPasswordInput("");
         setAuthSuccess(false);
       }, 600);
-    } else {
+    } catch {
       setAuthError(true);
       setAuthSuccess(false);
     }
   };
 
   const handleExitAdmin = () => {
-    setProfile({
-      ...profile,
-      role: "student",
-    });
+    clearAdminSession();
+    setIsAdminAuthenticated(false);
   };
 
   // If user is a student, show strictly the 403 Restricted Gate
-  if (profile.role !== "admin") {
+  if (!isAdminAuthenticated) {
     return (
       <div className="flex-1 flex items-center justify-center p-6 bg-background">
         <div className="max-w-md w-full p-8 rounded-3xl glass-card border border-border space-y-6 text-center animate-in fade-in zoom-in-95 duration-200">
@@ -105,20 +100,32 @@ export default function AdminPortalPage() {
             <form onSubmit={handleUnlockAdmin} className="space-y-2.5">
               <div>
                 <input
-                  type="password"
-                  value={passkeyInput}
+                  type="text"
+                  autoComplete="username"
+                  value={usernameInput}
                   onChange={(e) => {
-                    setPasskeyInput(e.target.value);
+                    setUsernameInput(e.target.value);
                     setAuthError(false);
                   }}
-                  placeholder="Enter administrator passkey…"
+                  placeholder="Administrator username"
                   className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-background text-foreground text-xs focus:outline-none focus:ring-2 focus:ring-primary font-mono"
+                />
+                <input
+                  type="password"
+                  autoComplete="current-password"
+                  value={passwordInput}
+                  onChange={(e) => {
+                    setPasswordInput(e.target.value);
+                    setAuthError(false);
+                  }}
+                  placeholder="Administrator password"
+                  className="mt-2 w-full px-3.5 py-2.5 rounded-xl border border-border bg-background text-foreground text-xs focus:outline-none focus:ring-2 focus:ring-primary font-mono"
                 />
               </div>
 
               {authError && (
                 <p className="text-[11px] text-danger-500 flex items-center gap-1">
-                  <AlertCircle className="w-3.5 h-3.5" /> Incorrect passkey. Access denied.
+                  <AlertCircle className="w-3.5 h-3.5" /> Invalid username or password.
                 </p>
               )}
 
@@ -130,7 +137,7 @@ export default function AdminPortalPage() {
 
               <button
                 type="submit"
-                disabled={!passkeyInput.trim() || authSuccess}
+                disabled={!usernameInput.trim() || !passwordInput || authSuccess}
                 className="w-full py-2 rounded-xl border border-border text-xs font-semibold text-foreground hover:bg-secondary transition-colors"
               >
                 Authenticate as Admin

@@ -68,6 +68,9 @@ DEFAULT_MODEL_PRICES = _get_model_prices()
 class Settings(BaseSettings):
     """All settings sourced from environment variables / .env file."""
 
+    admin_username: str = Field(default="", alias="ADMIN_USERNAME")
+    admin_password: str = Field(default="", alias="ADMIN_PASSWORD")
+
     # ── API keys ──────────────────────────────────────────
     gemini_api_key: str      = Field(default="", alias="GEMINI_API_KEY")
     gemini_api_key_free: str = Field(default="", alias="GEMINI_API_KEY_FREE")

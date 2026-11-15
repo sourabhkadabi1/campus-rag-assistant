@@ -15,7 +15,7 @@ import {
 
 export function Header() {
   const pathname = usePathname();
-  const { profile, setIsProfileModalOpen, setIsUpgradeModalOpen } =
+  const { profile, isAdminAuthenticated, setIsProfileModalOpen, setIsUpgradeModalOpen } =
     useApp();
 
   return (
@@ -69,7 +69,7 @@ export function Header() {
             </Link>
 
             {/* Admin link - only rendered for authenticated admin */}
-            {profile.role === "admin" && (
+            {isAdminAuthenticated && (
               <Link
                 href="/admin"
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
@@ -104,7 +104,7 @@ export function Header() {
                 {profile.is_paid && <BadgeCheck className="w-3.5 h-3.5 text-primary-500 inline" />}
               </span>
               <span className="text-[10px] text-muted-foreground capitalize">
-                {profile.role} ({profile.plan_name})
+                {isAdminAuthenticated ? "Admin workspace" : `${profile.role} (${profile.plan_name})`}
               </span>
             </div>
           </button>

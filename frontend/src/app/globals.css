@@ -59,6 +59,8 @@ form, section, [role="tabpanel"] { min-width: 0; }
 
 .study-app { min-height: calc(100vh - 4rem); background: var(--color-paper); }
 .study-app aside button.bg-primary { background: var(--color-paper-3) !important; color: var(--color-ink) !important; border-color: transparent; }
+.study-app aside .subject-picker button[aria-pressed="true"] { background: var(--color-paper-3); border-color: var(--color-rule-2); color: var(--color-ink); }
+.study-app aside .subject-picker button:hover { color: var(--color-ink); }
 .study-chat .bg-primary.text-primary-foreground:not(button) { background: var(--color-paper-2); color: var(--color-ink); border: 1px solid var(--color-rule); }
 .study-chat { min-width: 0; background: var(--color-paper); }
 .study-home { width: min(100%, 960px); align-self: center; }
@@ -88,10 +90,14 @@ form, section, [role="tabpanel"] { min-width: 0; }
 .katex-display { overflow-x: auto; overflow-y: hidden; margin: .85rem 0 !important; }
 
 .pricing-page { width: min(100%, 1152px); }
+.pricing-switcher { width: fit-content; margin-inline: auto; }
+.pricing-switch-option[aria-pressed="true"] { background: var(--color-paper-3); color: var(--color-ink); }
+.pricing-premium-action { background: var(--color-pricing-action); color: var(--color-pricing-action-ink); }
+.pricing-premium-action:hover { background: var(--color-pricing-action-hover); }
 .pricing-heading h1 { max-width: 13ch; font-size: clamp(2.5rem, 5vw, 4.25rem); line-height: 1.02; }
 .pricing-page > div.grid { gap: 1.25rem; }
 .pricing-page > div.grid > div { border: 1px solid var(--color-rule); border-radius: var(--radius-card); background: var(--color-paper-2); padding: clamp(1.25rem, 3vw, 2rem); box-shadow: none; }
-.pricing-page > div.grid > div + div { border-color: color-mix(in oklab, var(--color-accent) 55%, var(--color-rule)); }
+.pricing-page > div.grid > div + div { border-color: color-mix(in oklab, var(--color-cool) 58%, var(--color-rule)); background: color-mix(in oklab, var(--color-paper-2) 88%, var(--color-cool-soft)); }
 .pricing-page > div.grid > div > div:first-child > div:first-child { align-items: flex-start; }
 .pricing-page h2, .pricing-page h3 { font-family: var(--font-display); font-weight: 500; }
 .pricing-page table { min-width: 36rem; font-size: .95rem; font-variant-numeric: tabular-nums; }

@@ -37,7 +37,7 @@ const DETAILED_KEYWORDS = [
 ];
 
 export default function StudentChatPage() {
-  const { profile, quota, refreshQuota, setIsUpgradeModalOpen } = useApp();
+  const { profile, selectedSubject, quota, refreshQuota, setIsUpgradeModalOpen } = useApp();
 
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -103,6 +103,7 @@ export default function StudentChatPage() {
     if (e) e.preventDefault();
     const q = inputQuestion.trim();
     if (!q || isStreaming) return;
+    if (!selectedSubject) return;
 
     // Check if thinking mode is toggled by free user
     if (useThinking && !profile.is_paid) {
@@ -115,7 +116,7 @@ export default function StudentChatPage() {
     if (!activeSessionId) {
       try {
         const titleSnippet = q.slice(0, 30) + (q.length > 30 ? "…" : "");
-        const newSession = await createChatSession(profile, titleSnippet);
+        const newSession = await createChatSession(profile, titleSnippet, selectedSubject);
         activeSessionId = newSession.id;
         setSessionId(activeSessionId);
       } catch (err) {
@@ -167,6 +168,7 @@ export default function StudentChatPage() {
           sessionId: activeSessionId || undefined,
           detailed: isAutoDetailed || isDetailed,
           thinking: useThinking && profile.is_paid,
+          subject: selectedSubject,
         },
         {
           onFilter(data) {
@@ -452,7 +454,11 @@ export default function StudentChatPage() {
                   </button>
                 )}
                 <span>
-                  Searching <strong>Sem {profile.semester}</strong> documents
+                  {selectedSubject ? (
+                    <>Searching <strong>{selectedSubject}</strong> material</>
+                  ) : (
+                    "Choose a subject to search"
+                  )}
                 </span>
               </div>
             </div>
@@ -469,7 +475,9 @@ export default function StudentChatPage() {
                     handleSend();
                   }
                 }}
-                placeholder={`Ask anything from your Semester ${profile.semester} syllabus (e.g. "derive time complexity", "summarize chapter 2")…`}
+                placeholder={selectedSubject
+                  ? `Ask anything about ${selectedSubject}…`
+                  : "Choose a subject from the side panel to start asking…"}
                 rows={2}
                 className="flex-1 p-3.5 bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus:outline-none resize-none max-h-32"
               />
@@ -477,7 +485,7 @@ export default function StudentChatPage() {
               <div className="p-2 flex items-center gap-2">
                 <button
                   type="submit"
-                  disabled={!inputQuestion.trim() || isStreaming}
+                  disabled={!inputQuestion.trim() || !selectedSubject || isStreaming}
                   className="p-2.5 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed transition-colors shadow-md shadow-primary/20"
                   title="Send Question"
                 >

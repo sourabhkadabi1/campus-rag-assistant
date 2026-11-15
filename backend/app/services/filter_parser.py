@@ -170,6 +170,7 @@ async def parse_query(
     question: str,
     semester: int,
     department: str,
+    selected_subject: Optional[str] = None,
 ) -> ParsedQuery:
     """
     Parse a student question into structured filters.
@@ -195,9 +196,9 @@ async def parse_query(
     # 4. Match subject against known subjects from DB
     try:
         subjects = await get_known_subjects(semester, department)
-        result.subject = _match_subject(question, subjects)
+        result.subject = selected_subject or _match_subject(question, subjects)
     except Exception:
-        pass  # DB unavailable — subject matching skipped
+        result.subject = selected_subject
 
     # 5. Map unit → chapters via unit_chapter_map
     if result.unit_no:

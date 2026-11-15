@@ -66,6 +66,41 @@ class AskRequest(BaseModel):
     session_id: Optional[str] = None
     detailed: bool = False
     thinking: bool = False  # Explicit thinking-mode toggle (paid users only)
+    subject: Optional[str] = None
+
+
+SUPPORTED_DEPARTMENTS = {"CSE", "AIML"}
+SUPPORTED_SEMESTERS = {3, 4}
+
+
+async def _list_available_subjects(semester: int, department: str) -> list[str]:
+    rows = await fetch(
+        """SELECT DISTINCT d.subject FROM documents d
+           WHERE d.department = $1 AND d.semester = $2
+             AND d.is_active = TRUE AND d.ingestion_status = 'done'
+             AND EXISTS (
+               SELECT 1 FROM chunks c
+               WHERE c.document_id = d.id
+             )
+           ORDER BY d.subject""",
+        department, semester,
+    )
+    return [row["subject"] for row in rows]
+
+
+@router.get("/subjects")
+async def list_subjects(request: Request):
+    """List indexed subjects for the supported student cohort only."""
+    try:
+        semester = int(request.headers.get("X-Semester", "0"))
+    except ValueError:
+        raise HTTPException(400, "X-Semester must be an integer")
+    department = request.headers.get("X-Department", "").upper()
+
+    if department not in SUPPORTED_DEPARTMENTS or semester not in SUPPORTED_SEMESTERS:
+        return {"subjects": []}
+
+    return {"subjects": await _list_available_subjects(semester, department)}
 
 
 # ── Detailed detection (no LLM call) ─────────────────────────────
@@ -274,6 +309,18 @@ async def ask(request: Request, body: AskRequest):
             "headers (auth tokens in production).",
         )
 
+    department = department.upper()
+    if department not in SUPPORTED_DEPARTMENTS or semester not in SUPPORTED_SEMESTERS:
+        raise HTTPException(
+            403,
+            "Course search is currently available for CSE and AI-ML, semesters 3 and 4.",
+        )
+    if not body.subject:
+        raise HTTPException(400, "Choose a subject before asking a question.")
+    available_subjects = await _list_available_subjects(semester, department)
+    if body.subject not in available_subjects:
+        raise HTTPException(400, "That subject has no active indexed course material.")
+
     # ── Per-user per-minute abuse rate limit ──────────────
     if user_id:
         ok, count = check_user_rate_limit(user_id)
@@ -313,7 +360,10 @@ async def ask(request: Request, body: AskRequest):
         try:
             # ──── 1. Parse filters ────────────────────────
             parsed: ParsedQuery = await parse_query(
-                question, semester, department
+                question,
+                semester,
+                department,
+                selected_subject=body.subject,
             )
             yield {
                 "event": "filter",
@@ -343,7 +393,9 @@ async def ask(request: Request, body: AskRequest):
                 return
 
             # ──── 2. Answer cache ─────────────────────────
-            cache_key = make_cache_key(question, parsed.subject, semester)
+            cache_key = make_cache_key(
+                question, parsed.subject, semester, department=department
+            )
             cached: Optional[CachedAnswer] = await cache_lookup(cache_key)
             if cached:
                 cache_hit = True

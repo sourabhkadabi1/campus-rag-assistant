@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { ChatSession } from "@/lib/types";
 import { useApp } from "@/lib/context";
-import { listChatSessions, createChatSession, deleteChatSession } from "@/lib/api";
+import { listChatSessions, listAvailableSubjects, deleteChatSession } from "@/lib/api";
 import {
   Plus,
   MessageSquare,
@@ -14,6 +14,7 @@ import {
   ChevronLeft,
   ChevronRight,
   HelpCircle,
+  BookMarked,
 } from "lucide-react";
 
 interface SidebarProps {
@@ -33,9 +34,13 @@ export function Sidebar({
   isOpen,
   setIsOpen,
 }: SidebarProps) {
-  const { profile } = useApp();
+  const { profile, selectedSubject, setSelectedSubject } = useApp();
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [loading, setLoading] = useState(false);
+  const [subjects, setSubjects] = useState<string[]>([]);
+  const [subjectsLoading, setSubjectsLoading] = useState(true);
+  const [subjectsError, setSubjectsError] = useState(false);
+  const [subjectReload, setSubjectReload] = useState(0);
 
   const loadSessions = async () => {
     try {
@@ -52,6 +57,42 @@ export function Sidebar({
   useEffect(() => {
     loadSessions();
   }, [profile, currentSessionId]);
+
+  useEffect(() => {
+    let current = true;
+    setSubjectsLoading(true);
+    setSubjectsError(false);
+    listAvailableSubjects(profile)
+      .then((items) => {
+        if (current) setSubjects(items);
+      })
+      .catch(() => {
+        if (current) setSubjectsError(true);
+      })
+      .finally(() => {
+        if (current) setSubjectsLoading(false);
+      });
+    return () => {
+      current = false;
+    };
+  }, [profile.department, profile.semester, subjectReload]);
+
+  useEffect(() => {
+    if (!subjectsLoading && selectedSubject && !subjects.includes(selectedSubject)) {
+      setSelectedSubject(null);
+    }
+  }, [selectedSubject, setSelectedSubject, subjects, subjectsLoading]);
+
+  const handleChooseSubject = (subject: string) => {
+    if (subject === selectedSubject) return;
+    setSelectedSubject(subject);
+    onNewSession();
+  };
+
+  const visibleSessions = sessions.filter(
+    (session) => !selectedSubject || session.subject === selectedSubject
+  );
+  const departmentLabel = profile.department === "AIML" ? "AI-ML" : profile.department;
 
   const handleDelete = async (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
@@ -115,7 +156,7 @@ export function Sidebar({
             <span className="text-success-500 font-bold">Active</span>
           </div>
           <p className="text-foreground font-semibold">
-            Semester {profile.semester} • {profile.department}
+            Semester {profile.semester} • {departmentLabel}
           </p>
           <p className="text-[11px] text-muted-foreground leading-tight">
             Queries only retrieve admin-approved textbooks & syllabus for your current semester.
@@ -129,17 +170,20 @@ export function Sidebar({
           </span>
 
           <div className="space-y-1">
-            {sessions.length === 0 ? (
+            {visibleSessions.length === 0 ? (
               <div className="p-3 text-center text-xs text-muted-foreground">
-                No past sessions yet
+                {selectedSubject ? `No ${selectedSubject} sessions yet` : "No past sessions yet"}
               </div>
             ) : (
-              sessions.map((session) => {
+              visibleSessions.map((session) => {
                 const isActive = session.id === currentSessionId;
                 return (
                   <div
                     key={session.id}
-                    onClick={() => onSelectSession(session.id)}
+                    onClick={() => {
+                      setSelectedSubject(session.subject);
+                      onSelectSession(session.id);
+                    }}
                     className={`group flex items-center justify-between p-2.5 rounded-xl text-xs font-medium cursor-pointer transition-colors ${
                       isActive
                         ? "bg-secondary text-primary font-semibold border border-primary/20 shadow-sm"
@@ -164,6 +208,57 @@ export function Sidebar({
             )}
           </div>
         </div>
+
+        {/* Branch and semester subject scope */}
+        <section className="subject-picker space-y-2 border-t border-border pt-3" aria-label="Choose a course subject">
+          <div className="flex items-center justify-between px-2">
+            <span className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
+              <BookMarked className="w-3.5 h-3.5 text-primary-500" />
+              Choose a subject
+            </span>
+            <span className="text-[10px] text-muted-foreground">Sem {profile.semester}</span>
+          </div>
+          <p className="px-2 text-[11px] text-muted-foreground">
+            Search stays inside the selected course.
+          </p>
+          {subjectsLoading ? (
+            <p className="px-2 py-2 text-xs text-muted-foreground">Loading indexed subjects…</p>
+          ) : subjectsError ? (
+            <button
+              type="button"
+              onClick={() => setSubjectReload((value) => value + 1)}
+              className="w-full rounded-lg px-2 py-2 text-left text-xs text-muted-foreground hover:bg-secondary"
+            >
+              Couldn't load subjects. Retry
+            </button>
+          ) : subjects.length > 0 ? (
+            <div className="space-y-1">
+              {subjects.map((subject) => {
+                const isSelected = subject === selectedSubject;
+                return (
+                  <button
+                    key={subject}
+                    type="button"
+                    aria-pressed={isSelected}
+                    onClick={() => handleChooseSubject(subject)}
+                    className={`w-full flex min-h-10 items-center justify-between rounded-lg px-3 py-2 text-left text-xs transition-colors ${
+                      isSelected
+                        ? "bg-secondary text-foreground border border-border"
+                        : "text-muted-foreground hover:bg-secondary/70 hover:text-foreground"
+                    }`}
+                  >
+                    <span className="truncate">{subject}</span>
+                    {isSelected && <span className="ml-2 text-[10px] text-primary">Selected</span>}
+                  </button>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="px-2 py-2 text-xs leading-relaxed text-muted-foreground">
+              No indexed subjects for {departmentLabel}, semester {profile.semester}. Available scope: CSE or AI-ML, semesters 3 and 4.
+            </p>
+          )}
+        </section>
 
         {/* Suggested Quick Prompts */}
         <div className="pt-2 border-t border-border space-y-2">
