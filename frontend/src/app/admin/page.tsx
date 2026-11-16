@@ -84,7 +84,7 @@ export default function AdminPortalPage() {
           <div className="pt-2">
             <Link
               href="/"
-              className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-primary text-primary-foreground text-xs font-semibold hover:bg-primary/90 transition-colors shadow-md shadow-primary/20"
+              className="admin-gate-return w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-primary text-primary-foreground text-xs font-semibold hover:bg-primary/90 transition-colors shadow-md shadow-primary/20"
             >
               <ArrowLeft className="w-4 h-4" />
               Return to Student Assistant

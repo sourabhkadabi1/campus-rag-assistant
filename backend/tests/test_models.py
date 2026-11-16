@@ -60,7 +60,7 @@ class TestDocumentUploadMeta:
 class TestDocTypeEnum:
     def test_values(self):
         assert set(DocType) == {
-            DocType.SYLLABUS, DocType.BOOK, DocType.NOTES, DocType.PREVIOUS_PAPER
+            DocType.SYLLABUS, DocType.BOOK, DocType.NOTES, DocType.PREVIOUS_PAPER, DocType.SLIDES_PDF
         }
 
 

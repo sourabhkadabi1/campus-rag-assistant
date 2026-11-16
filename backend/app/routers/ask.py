@@ -137,7 +137,7 @@ async def _serve_chapter_summary(
         FROM chapter_summaries cs
         JOIN documents d ON cs.document_id = d.id
         WHERE cs.chapter_no = $1 AND d.semester = $2 AND d.department = $3
-              AND d.is_active = TRUE
+              AND d.is_active = TRUE AND d.doc_type <> 'previous_paper'
     """
     args: list = [chapter_no, semester, department]
     idx = 4
@@ -333,8 +333,13 @@ async def ask(request: Request, body: AskRequest):
 
     question = body.question
     session_id = body.session_id
+    previous_paper_request = bool(re.search(
+        r"\b(previous[- ]year|previous[- ]paper|past[- ]year|past paper|pyq|question paper|exam paper)\b",
+        question,
+        re.IGNORECASE,
+    ))
     # Auto-detect detailed based on keywords/word count
-    is_detailed = detect_detailed(question) or body.detailed
+    is_detailed = detect_detailed(question) or body.detailed or previous_paper_request
     thinking_requested = body.thinking
 
     # ── SSE event generator ───────────────────────────────
@@ -394,7 +399,7 @@ async def ask(request: Request, body: AskRequest):
 
             # ──── 2. Answer cache ─────────────────────────
             cache_key = make_cache_key(
-                question, parsed.subject, semester, department=department
+                f"grounding-v5:{question}", parsed.subject, semester, department=department
             )
             cached: Optional[CachedAnswer] = await cache_lookup(cache_key)
             if cached:
@@ -609,7 +614,7 @@ async def ask(request: Request, body: AskRequest):
                 try:
                     force_retrieval_only = await should_use_retrieval_only(
                         plan_info.get("is_paid", False)
-                    )
+                    ) and not previous_paper_request
                 except Exception:
                     pass
 
@@ -621,7 +626,9 @@ async def ask(request: Request, body: AskRequest):
                 subject=parsed.subject,
                 chapter_no=parsed.chapter_no,
                 unit_chapters=parsed.matched_chapters_from_unit or None,
-                limit=profile_chunks,
+                include_previous_papers=previous_paper_request,
+                previous_papers_only=False,
+                limit=max(profile_chunks, 12) if previous_paper_request else profile_chunks,
             )
 
             if fallback_msg:
@@ -691,6 +698,19 @@ async def ask(request: Request, body: AskRequest):
                 "data": json.dumps({"route": "llm"}),
             }
 
+            llm_question = parsed.clean_query
+            if previous_paper_request:
+                llm_question += (
+                    "\n\n[Exam / Past-Paper Instructions]:\n"
+                    "- Carefully examine the provided previous-year paper excerpts and course materials.\n"
+                    "- If the student is asking to solve, answer, or explain past exam question(s), provide the complete, "
+                    "high-scoring, step-by-step solution and detailed explanation using the course materials. Include all relevant formulas, "
+                    "code, principles, or derivations needed to score full marks.\n"
+                    "- If the student asks to list or extract previous-year questions, clearly list the distinct questions "
+                    "found in the excerpts along with a concise explanation or answer outline for each.\n"
+                    "- Ground all answers and citations in the provided materials without inventing missing questions or details."
+                )
+
             # Select API key based on plan
             if is_paid:
                 api_key = settings.gemini_api_key_paid
@@ -718,15 +738,15 @@ async def ask(request: Request, body: AskRequest):
             # prompt budgeting, and rate limits.
             async for event in route_and_generate(
                 chunks=chunks,
-                question=parsed.clean_query,
+                question=llm_question,
                 history=history,
                 detailed=is_detailed,
                 is_paid=is_paid,
                 api_key=api_key,
                 thinking_mode=use_thinking,
                 thinking_config=thinking_config,
-                max_output_tokens=profile_max_output,
-                profile_chunks=profile_chunks,
+                max_output_tokens=2000 if previous_paper_request else profile_max_output,
+                profile_chunks=12 if previous_paper_request else profile_chunks,
             ):
                 if event["type"] == "model_selected":
                     model_used = event["model_id"]

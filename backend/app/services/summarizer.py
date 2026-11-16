@@ -103,10 +103,11 @@ Summarise the following chapter for a college student preparing for exams.
 Chapter {ch_no}: {ch_title}
 
 Instructions:
-- Clear, structured summary covering all major topics.
-- 5–10 key concepts with one-line explanations.
-- Include important formulas / definitions if present.
-- 300–500 words, bullet points for readability.
+- Clear, structured summary covering all major topics with substantive explanations for each topic.
+- 5–10 key concepts with clear, informative explanations.
+- Include important formulas / definitions / key algorithms if present.
+- 300–500 words, structured with informative paragraphs and bullet points for readability.
+- Do not output bare headings or empty outlines without explanation.
 
 Format:
 ## Summary

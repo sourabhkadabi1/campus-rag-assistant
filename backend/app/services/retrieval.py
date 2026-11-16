@@ -77,12 +77,18 @@ async def _vector_search(
     chapter_no: Optional[int] = None,
     chapters: Optional[list[int]] = None,
     academic_year: Optional[str] = None,
+    include_previous_papers: bool = False,
+    previous_papers_only: bool = False,
     limit: int = 20,
 ) -> list[dict]:
     """Cosine similarity search via pgvector."""
     emb_str = "[" + ",".join(str(v) for v in query_embedding) + "]"
 
     conditions = ["d.is_active = TRUE", "c.semester = $1", "c.department = $2"]
+    if previous_papers_only:
+        conditions.append("c.doc_type = 'previous_paper'")
+    elif not include_previous_papers:
+        conditions.append("c.doc_type <> 'previous_paper'")
     args: list = [semester, department]
     idx = 3
 
@@ -135,10 +141,16 @@ async def _fulltext_search(
     chapter_no: Optional[int] = None,
     chapters: Optional[list[int]] = None,
     academic_year: Optional[str] = None,
+    include_previous_papers: bool = False,
+    previous_papers_only: bool = False,
     limit: int = 20,
 ) -> list[dict]:
     """Full-text search using tsvector + plainto_tsquery."""
     conditions = ["d.is_active = TRUE", "c.semester = $1", "c.department = $2"]
+    if previous_papers_only:
+        conditions.append("c.doc_type = 'previous_paper'")
+    elif not include_previous_papers:
+        conditions.append("c.doc_type <> 'previous_paper'")
     args: list = [semester, department]
     idx = 3
 
@@ -199,6 +211,8 @@ async def hybrid_search(
     chapter_no: Optional[int] = None,
     unit_chapters: Optional[list[int]] = None,
     academic_year: Optional[str] = None,
+    include_previous_papers: bool = False,
+    previous_papers_only: bool = False,
     limit: int = 4,
 ) -> tuple[list[RetrievalResult], Optional[str]]:
     """
@@ -221,12 +235,12 @@ async def hybrid_search(
     vec_results = await _vector_search(
         query_embedding, semester, department,
         subject=subject, chapter_no=chapter_no, chapters=chapters,
-        academic_year=academic_year, limit=limit * 3,
+        academic_year=academic_year, include_previous_papers=include_previous_papers, previous_papers_only=previous_papers_only, limit=limit * 3,
     )
     ft_results = await _fulltext_search(
         query, semester, department,
         subject=subject, chapter_no=chapter_no, chapters=chapters,
-        academic_year=academic_year, limit=limit * 3,
+        academic_year=academic_year, include_previous_papers=include_previous_papers, previous_papers_only=previous_papers_only, limit=limit * 3,
     )
 
     fallback_message: Optional[str] = None
@@ -241,12 +255,12 @@ async def hybrid_search(
         vec_results = await _vector_search(
             query_embedding, semester, department,
             subject=subject,
-            academic_year=academic_year, limit=limit * 3,
+            academic_year=academic_year, include_previous_papers=include_previous_papers, previous_papers_only=previous_papers_only, limit=limit * 3,
         )
         ft_results = await _fulltext_search(
             query, semester, department,
             subject=subject,
-            academic_year=academic_year, limit=limit * 3,
+            academic_year=academic_year, include_previous_papers=include_previous_papers, previous_papers_only=previous_papers_only, limit=limit * 3,
         )
 
         if vec_results or ft_results:
