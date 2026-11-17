@@ -29,10 +29,10 @@ DEFAULT_MODEL_LIMITS: dict[str, dict[str, int]] = {
 
 # ── Response profiles: (plan, detailed) -> {chunks, max_output, units} ──
 RESPONSE_PROFILES: dict[tuple[str, bool], dict[str, int]] = {
-    ("free", False):  {"chunks": 3, "max_output": 600,  "units": 1},
-    ("free", True):   {"chunks": 5, "max_output": 1000, "units": 2},
-    ("paid", False):  {"chunks": 4, "max_output": 800,  "units": 1},
-    ("paid", True):   {"chunks": 6, "max_output": 2000, "units": 2},
+    ("free", False):  {"chunks": 6, "max_output": 1200, "units": 1},
+    ("free", True):   {"chunks": 8, "max_output": 2200, "units": 2},
+    ("paid", False):  {"chunks": 8, "max_output": 1800, "units": 1},
+    ("paid", True):   {"chunks": 12, "max_output": 3500, "units": 2},
 }
 
 

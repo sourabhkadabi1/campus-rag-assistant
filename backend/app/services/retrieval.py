@@ -223,8 +223,13 @@ async def hybrid_search(
     and we retried without the chapter constraint, preserving branch,
     semester, and subject scope.
     """
-    # 1. Embed the query
-    query_embedding = get_embedding(query)
+    # 1. Embed the query (prefix with subject context to anchor acronyms and short terms)
+    embed_query = (
+        f"{subject}: {query}"
+        if subject and not query.lower().startswith(subject.lower()[:4])
+        else query
+    )
+    query_embedding = get_embedding(embed_query)
 
     # 2. Determine chapter filter
     chapters = None

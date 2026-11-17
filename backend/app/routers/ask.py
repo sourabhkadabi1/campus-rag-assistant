@@ -399,7 +399,7 @@ async def ask(request: Request, body: AskRequest):
 
             # ──── 2. Answer cache ─────────────────────────
             cache_key = make_cache_key(
-                f"grounding-v5:{question}", parsed.subject, semester, department=department
+                f"grounding-v6:{question}", parsed.subject, semester, department=department
             )
             cached: Optional[CachedAnswer] = await cache_lookup(cache_key)
             if cached:

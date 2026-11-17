@@ -155,10 +155,10 @@ def test_detailed_detection_short_normal():
 
 
 def test_response_profiles_matrix():
-    assert RESPONSE_PROFILES[("free", False)] == {"chunks": 3, "max_output": 600, "units": 1}
-    assert RESPONSE_PROFILES[("free", True)]  == {"chunks": 5, "max_output": 1000, "units": 2}
-    assert RESPONSE_PROFILES[("paid", False)] == {"chunks": 4, "max_output": 800, "units": 1}
-    assert RESPONSE_PROFILES[("paid", True)]  == {"chunks": 6, "max_output": 2000, "units": 2}
+    assert RESPONSE_PROFILES[("free", False)] == {"chunks": 6, "max_output": 1200, "units": 1}
+    assert RESPONSE_PROFILES[("free", True)]  == {"chunks": 8, "max_output": 2200, "units": 2}
+    assert RESPONSE_PROFILES[("paid", False)] == {"chunks": 8, "max_output": 1800, "units": 1}
+    assert RESPONSE_PROFILES[("paid", True)]  == {"chunks": 12, "max_output": 3500, "units": 2}
 
 
 # ╔════════════════════════════════════════════════════════════════╗
