@@ -44,6 +44,7 @@ export function DocumentUpload() {
   const [subject, setSubject] = useState("Database Management Systems");
   const [academicYear, setAcademicYear] = useState("2026-27");
   const [docType, setDocType] = useState("book");
+  const [unitNo, setUnitNo] = useState<number | null>(null);
   const [isActive, setIsActive] = useState(true);
 
   // Filter state
@@ -90,11 +91,13 @@ export function DocumentUpload() {
           subject,
           academic_year: academicYear,
           doc_type: docType,
+          unit_no: unitNo,
           is_active: isActive,
         },
         profile
       );
       setFile(null);
+      setUnitNo(null);
       // Reset input element
       const fileInput = document.getElementById("doc-file-input") as HTMLInputElement;
       if (fileInput) fileInput.value = "";
@@ -187,7 +190,21 @@ export function DocumentUpload() {
               id="doc-file-input"
               type="file"
               accept=".pdf"
-              onChange={(e) => setFile(e.target.files?.[0] || null)}
+              onChange={(e) => {
+                const selected = e.target.files?.[0] || null;
+                setFile(selected);
+                if (selected) {
+                  // Auto-detect unit from filename (e.g. Unit 1, Unit_2, Module-3)
+                  const unitMatch = selected.name.match(/(?:unit|module)\s*[-_]?\s*(\d+)/i);
+                  if (unitMatch) {
+                    setUnitNo(parseInt(unitMatch[1], 10));
+                  }
+                  // Auto-detect doc_type slides from filename
+                  if (/slide/i.test(selected.name)) {
+                    setDocType("slides_pdf");
+                  }
+                }
+              }}
               required
               className="hidden"
             />
@@ -207,7 +224,7 @@ export function DocumentUpload() {
           </div>
 
           {/* Metadata Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 text-xs">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3.5 text-xs">
             <div>
               <label className="block font-medium text-foreground mb-1">Department</label>
               <select
@@ -248,6 +265,22 @@ export function DocumentUpload() {
                 {DOC_TYPES.map((t) => (
                   <option key={t} value={t}>
                     {t === "slides_pdf" ? "Slides PDF" : t.replace("_", " ")}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block font-medium text-foreground mb-1">Unit / Module</label>
+              <select
+                value={unitNo ?? ""}
+                onChange={(e) => setUnitNo(e.target.value ? Number(e.target.value) : null)}
+                className="w-full px-3 py-2 rounded-xl border border-border bg-background text-foreground font-medium"
+              >
+                <option value="">No Unit (Full Book)</option>
+                {[1, 2, 3, 4, 5, 6, 7, 8].map((u) => (
+                  <option key={u} value={u}>
+                    Unit {u}
                   </option>
                 ))}
               </select>
@@ -389,6 +422,11 @@ export function DocumentUpload() {
                       </td>
                       <td className="p-3.5">
                         <span className="font-medium text-foreground">
+                          {doc.unit_no ? (
+                            <span className="inline-block px-1.5 py-0.5 rounded bg-primary/10 text-primary font-bold text-[10px] mr-1">
+                              Unit {doc.unit_no}
+                            </span>
+                          ) : null}
                           Sem {doc.semester} • {doc.department}
                         </span>
                         <div className="text-[10px] text-muted-foreground">{doc.academic_year}</div>

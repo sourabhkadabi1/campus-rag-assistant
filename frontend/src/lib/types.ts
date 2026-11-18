@@ -35,6 +35,7 @@ export interface Citation {
   doc_type: string;
   chapter_no: number | null;
   chapter_title: string | null;
+  unit_no?: number | null;
   page_start: number | null;
   page_end: number | null;
   document_id: string;
@@ -73,6 +74,7 @@ export interface DocumentItem {
   subject: string;
   academic_year: string;
   doc_type: "syllabus" | "book" | "notes" | "previous_paper" | "slides_pdf";
+  unit_no?: number | null;
   is_active: boolean;
   file_size_bytes: number;
   total_pages: number | null;

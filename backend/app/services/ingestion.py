@@ -151,7 +151,10 @@ def _ocr_page(page, pdf_path: str, page_num: int) -> str:
 # ╚════════════════════════════════════════════════════════════════╝
 
 
-def detect_chapters(pages: list[PageContent]) -> list[ChapterInfo]:
+def detect_chapters(
+    pages: list[PageContent],
+    is_slides_or_notes: bool = False,
+) -> list[ChapterInfo]:
     """
     Detect chapter / unit headings using regex + font-size heuristics.
     Returns deduplicated chapters sorted by page_start.
@@ -162,13 +165,19 @@ def detect_chapters(pages: list[PageContent]) -> list[ChapterInfo]:
 
     chapters: list[ChapterInfo] = []
 
+    # Exclude bare numbered points like "1. ..." on slide presentations / notes
+    active_patterns = [
+        p for p in CHAPTER_PATTERNS
+        if not (is_slides_or_notes and p.pattern.startswith(r"^(\d+)\."))
+    ]
+
     for page in pages:
         for line in page.text.split("\n"):
             stripped = line.strip()
             if not stripped or len(stripped) > 200:
                 continue
 
-            for pattern in CHAPTER_PATTERNS:
+            for pattern in active_patterns:
                 m = pattern.match(stripped)
                 if not m:
                     continue
@@ -314,6 +323,7 @@ def chunk_text(
     chapters: list[ChapterInfo],
     chunk_size: Optional[int] = None,
     chunk_overlap: Optional[int] = None,
+    doc_unit_no: Optional[int] = None,
 ) -> list[TextChunk]:
     """
     Chunk the full document, respecting chapter boundaries.
@@ -338,7 +348,7 @@ def chunk_text(
         if not section.strip():
             continue
 
-        unit_no = ch_no if h_type in ("unit", "module") else None
+        unit_no = doc_unit_no if doc_unit_no is not None else (ch_no if h_type in ("unit", "module") else None)
 
         for raw in _split_into_chunks(section, chunk_size, chunk_overlap):
             ps, pe = _find_chunk_pages(raw, pg_start, pg_end)
@@ -389,12 +399,15 @@ async def ingest_document(
         )
         logger.info("doc %s: extracted %d pages", document_id, total_pages)
 
-        # 2. Detect chapters
-        chapters = detect_chapters(pages)
+        # 2. Detect chapters (exclude bare numbered bullets on slides/notes/units)
+        unit_no = metadata.get("unit_no")
+        doc_type = metadata.get("doc_type", "")
+        is_slides_or_notes = doc_type in ("slides_pdf", "notes") or unit_no is not None
+        chapters = detect_chapters(pages, is_slides_or_notes=is_slides_or_notes)
         logger.info("doc %s: detected %d chapters", document_id, len(chapters))
 
         # 3. Chunk
-        chunks = chunk_text(pages, chapters)
+        chunks = chunk_text(pages, chapters, doc_unit_no=unit_no)
         logger.info("doc %s: created %d chunks", document_id, len(chunks))
 
         if not chunks:
@@ -420,6 +433,7 @@ async def ingest_document(
 
             for chunk, emb in zip(chunks, embeddings):
                 emb_str = "[" + ",".join(str(v) for v in emb) + "]"
+                c_unit_no = chunk.unit_no if chunk.unit_no is not None else unit_no
                 await conn.execute(
                     """INSERT INTO chunks
                        (id, document_id, content, embedding,
@@ -433,9 +447,21 @@ async def ingest_document(
                     metadata["semester"], metadata["department"],
                     metadata["subject"], metadata["academic_year"],
                     metadata["doc_type"],
-                    chunk.chapter_no, chunk.chapter_title, chunk.unit_no,
+                    chunk.chapter_no, chunk.chapter_title, c_unit_no,
                     chunk.page_start, chunk.page_end,
                     chunk.chunk_index, chunk.token_count,
+                )
+
+            # Record in unit_chapter_map if unit is known
+            if unit_no is not None:
+                await conn.execute(
+                    """INSERT INTO unit_chapter_map
+                       (id, subject, semester, department, academic_year, unit_no, unit_title, document_id)
+                       VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+                       ON CONFLICT DO NOTHING""",
+                    str(uuid.uuid4()), metadata["subject"], metadata["semester"],
+                    metadata["department"], metadata["academic_year"],
+                    unit_no, f"Unit {unit_no}", uuid.UUID(document_id),
                 )
 
         logger.info("doc %s: stored %d chunks", document_id, len(chunks))

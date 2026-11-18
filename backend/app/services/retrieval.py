@@ -76,6 +76,7 @@ async def _vector_search(
     subject: Optional[str] = None,
     chapter_no: Optional[int] = None,
     chapters: Optional[list[int]] = None,
+    unit_no: Optional[int] = None,
     academic_year: Optional[str] = None,
     include_previous_papers: bool = False,
     previous_papers_only: bool = False,
@@ -97,7 +98,16 @@ async def _vector_search(
         args.append(subject)
         idx += 1
 
-    if chapter_no is not None:
+    if unit_no is not None:
+        if chapters:
+            conditions.append(f"(c.unit_no = ${idx} OR c.chapter_no = ANY(${idx + 1}::int[]))")
+            args.extend([unit_no, chapters])
+            idx += 2
+        else:
+            conditions.append(f"c.unit_no = ${idx}")
+            args.append(unit_no)
+            idx += 1
+    elif chapter_no is not None:
         conditions.append(f"c.chapter_no = ${idx}")
         args.append(chapter_no)
         idx += 1
@@ -140,6 +150,7 @@ async def _fulltext_search(
     subject: Optional[str] = None,
     chapter_no: Optional[int] = None,
     chapters: Optional[list[int]] = None,
+    unit_no: Optional[int] = None,
     academic_year: Optional[str] = None,
     include_previous_papers: bool = False,
     previous_papers_only: bool = False,
@@ -166,7 +177,16 @@ async def _fulltext_search(
         args.append(subject)
         idx += 1
 
-    if chapter_no is not None:
+    if unit_no is not None:
+        if chapters:
+            conditions.append(f"(c.unit_no = ${idx} OR c.chapter_no = ANY(${idx + 1}::int[]))")
+            args.extend([unit_no, chapters])
+            idx += 2
+        else:
+            conditions.append(f"c.unit_no = ${idx}")
+            args.append(unit_no)
+            idx += 1
+    elif chapter_no is not None:
         conditions.append(f"c.chapter_no = ${idx}")
         args.append(chapter_no)
         idx += 1
@@ -209,6 +229,7 @@ async def hybrid_search(
     department: str,
     subject: Optional[str] = None,
     chapter_no: Optional[int] = None,
+    unit_no: Optional[int] = None,
     unit_chapters: Optional[list[int]] = None,
     academic_year: Optional[str] = None,
     include_previous_papers: bool = False,
@@ -240,11 +261,13 @@ async def hybrid_search(
     vec_results = await _vector_search(
         query_embedding, semester, department,
         subject=subject, chapter_no=chapter_no, chapters=chapters,
+        unit_no=unit_no,
         academic_year=academic_year, include_previous_papers=include_previous_papers, previous_papers_only=previous_papers_only, limit=limit * 3,
     )
     ft_results = await _fulltext_search(
         query, semester, department,
         subject=subject, chapter_no=chapter_no, chapters=chapters,
+        unit_no=unit_no,
         academic_year=academic_year, include_previous_papers=include_previous_papers, previous_papers_only=previous_papers_only, limit=limit * 3,
     )
 
@@ -254,9 +277,9 @@ async def hybrid_search(
     if (
         not vec_results
         and not ft_results
-        and (chapter_no or chapters)
+        and (chapter_no or chapters or unit_no)
     ):
-        logger.info("Filtered search empty — retrying without chapter filters")
+        logger.info("Filtered search empty — retrying without chapter/unit filters")
         vec_results = await _vector_search(
             query_embedding, semester, department,
             subject=subject,
@@ -271,14 +294,22 @@ async def hybrid_search(
         if vec_results or ft_results:
             # Build a helpful fallback message
             parts = []
-            if chapter_no:
+            if unit_no:
+                parts.append(f"not directly indexed under Unit {unit_no}")
+            elif chapter_no:
                 parts.append(f"not in Chapter {chapter_no}")
             found_chapters: set[int] = set()
+            found_units: set[int] = set()
             for r in vec_results + ft_results:
                 if r.get("chapter_no"):
                     found_chapters.add(r["chapter_no"])
+                if r.get("unit_no"):
+                    found_units.add(r["unit_no"])
 
-            if found_chapters:
+            if found_units:
+                u_str = ", ".join(f"Unit {u}" for u in sorted(found_units)[:2])
+                parts.append(f"found in {u_str}")
+            elif found_chapters:
                 ch_str = ", ".join(
                     f"Chapter {c}" for c in sorted(found_chapters)[:3]
                 )

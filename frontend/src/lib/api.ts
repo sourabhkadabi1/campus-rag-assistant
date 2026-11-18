@@ -292,6 +292,7 @@ export async function uploadDocument(
     subject: string;
     academic_year: string;
     doc_type: string;
+    unit_no?: number | null;
     is_active?: boolean;
   },
   profile?: StudentProfile
@@ -303,6 +304,9 @@ export async function uploadDocument(
   formData.append("subject", metadata.subject);
   formData.append("academic_year", metadata.academic_year);
   formData.append("doc_type", metadata.doc_type);
+  if (metadata.unit_no !== undefined && metadata.unit_no !== null) {
+    formData.append("unit_no", metadata.unit_no.toString());
+  }
   formData.append("is_active", (metadata.is_active ?? true).toString());
 
   const headers: Record<string, string> = {};

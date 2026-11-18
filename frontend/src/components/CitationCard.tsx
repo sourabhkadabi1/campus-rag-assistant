@@ -51,12 +51,15 @@ export function CitationCard({ citation, index }: CitationCardProps) {
           {citation.subject}
         </h4>
 
-        {citation.chapter_no !== null && (
+        {(citation.unit_no !== undefined && citation.unit_no !== null) || citation.chapter_no !== null ? (
           <p className="text-[11px] text-muted-foreground line-clamp-1">
-            Chapter {citation.chapter_no}
-            {citation.chapter_title ? `: ${citation.chapter_title}` : ""}
+            {citation.unit_no ? `Unit ${citation.unit_no}` : ""}
+            {citation.unit_no && citation.chapter_no !== null ? " • " : ""}
+            {citation.chapter_no !== null
+              ? `Chapter ${citation.chapter_no}${citation.chapter_title ? `: ${citation.chapter_title}` : ""}`
+              : ""}
           </p>
-        )}
+        ) : null}
       </div>
 
       <div className="mt-2 pt-2 border-t border-border flex items-center justify-between text-[11px]">

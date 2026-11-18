@@ -263,7 +263,7 @@ def _build_citations(chunks: list[RetrievalResult]) -> list[dict]:
     seen: set[tuple] = set()
 
     for chunk in chunks:
-        key = (chunk.subject, chunk.chapter_no, chunk.page_start)
+        key = (chunk.subject, chunk.chapter_no, chunk.unit_no, chunk.page_start)
         if key in seen:
             continue
         seen.add(key)
@@ -272,6 +272,7 @@ def _build_citations(chunks: list[RetrievalResult]) -> list[dict]:
             "doc_type": chunk.doc_type,
             "chapter_no": chunk.chapter_no,
             "chapter_title": chunk.chapter_title,
+            "unit_no": chunk.unit_no,
             "page_start": chunk.page_start,
             "page_end": chunk.page_end,
             "document_id": chunk.document_id,
@@ -399,7 +400,7 @@ async def ask(request: Request, body: AskRequest):
 
             # ──── 2. Answer cache ─────────────────────────
             cache_key = make_cache_key(
-                f"grounding-v6:{question}", parsed.subject, semester, department=department
+                f"grounding-v7:{question}", parsed.subject, semester, department=department
             )
             cached: Optional[CachedAnswer] = await cache_lookup(cache_key)
             if cached:
@@ -625,6 +626,7 @@ async def ask(request: Request, body: AskRequest):
                 department=department,
                 subject=parsed.subject,
                 chapter_no=parsed.chapter_no,
+                unit_no=parsed.unit_no,
                 unit_chapters=parsed.matched_chapters_from_unit or None,
                 include_previous_papers=previous_paper_request,
                 previous_papers_only=False,

@@ -44,6 +44,7 @@ class DocumentUploadMeta(BaseModel):
         ..., pattern=r"^\d{4}-\d{2,4}$", description="e.g. '2026-27'"
     )
     doc_type: DocType
+    unit_no: Optional[int] = Field(None, ge=1, le=20, description="e.g. 1 for Unit 1")
     is_active: bool = True
 
 
@@ -60,6 +61,7 @@ class DocumentResponse(BaseModel):
     subject: str
     academic_year: str
     doc_type: DocType
+    unit_no: Optional[int] = None
     is_active: bool
     file_size_bytes: Optional[int] = None
     total_pages: Optional[int] = None

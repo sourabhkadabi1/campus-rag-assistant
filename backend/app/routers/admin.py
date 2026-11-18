@@ -84,6 +84,7 @@ async def upload_document(
     subject: str = Form(...),
     academic_year: str = Form(...),
     doc_type: DocType = Form(...),
+    unit_no: Optional[int] = Form(None),
     is_active: bool = Form(True),
 ):
     """
@@ -117,11 +118,11 @@ async def upload_document(
     await execute(
         """INSERT INTO documents
            (id, filename, original_filename, department, semester,
-            subject, academic_year, doc_type, is_active,
+            subject, academic_year, doc_type, unit_no, is_active,
             file_path, file_size_bytes, ingestion_status)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,'queued')""",
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,'queued')""",
         doc_id, safe_name, file.filename, department, semester,
-        subject, academic_year, doc_type.value, is_active,
+        subject, academic_year, doc_type.value, unit_no, is_active,
         str(file_path), len(content),
     )
 
@@ -132,6 +133,7 @@ async def upload_document(
         "subject": subject,
         "academic_year": academic_year,
         "doc_type": doc_type.value,
+        "unit_no": unit_no,
     }
     background_tasks.add_task(ingest_document, doc_id, str(file_path), metadata)
 
@@ -456,6 +458,7 @@ def _row_to_doc(row) -> DocumentResponse:
         subject=row["subject"],
         academic_year=row["academic_year"],
         doc_type=row["doc_type"],
+        unit_no=row.get("unit_no") if hasattr(row, "get") else (row["unit_no"] if "unit_no" in row else None),
         is_active=row["is_active"],
         file_size_bytes=row["file_size_bytes"],
         total_pages=row["total_pages"],
