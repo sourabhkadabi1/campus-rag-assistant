@@ -248,7 +248,7 @@ class Settings(BaseSettings):
         return self.max_upload_size_mb * 1024 * 1024
 
     model_config = {
-        "env_file": (".env", "../.env"),
+        "env_file": (".env", "backend/.env", "../.env"),
         "env_file_encoding": "utf-8",
         "extra": "ignore",
         "populate_by_name": True,

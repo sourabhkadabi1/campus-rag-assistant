@@ -48,7 +48,9 @@ The local frontend and backend were started. A fresh previous-year question requ
 - Added `backend/scripts/evaluate_rag.py`: 11-category RAG evaluation suite (grounding, isolation, injection, out_of_scope, route, profile)
 - Added `backend/tests/test_security.py`: 43 security tests — all pass
 - `backend/requirements.txt`: added `sentry-sdk[fastapi]>=2.0.0`
-- `backend/app/config.py`: added `log_format`, `log_level`, `sentry_dsn`, `environment` settings fields
+- `backend/app/config.py`: added `log_format`, `log_level`, `sentry_dsn`, `environment` settings fields; updated `model_config["env_file"]` to include `"backend/.env"` so credentials load when running from repo root
+- Synced `ADMIN_USERNAME` and `ADMIN_PASSWORD` to root `.env` and `.env.example`
+- Hardened `authenticate_admin` and `security.py` admin token check to strip whitespace and log auth failures
 
 ### Still requires deployment-time action
 - Run `backend/migrations/004_phase6.sql` in Supabase SQL Editor

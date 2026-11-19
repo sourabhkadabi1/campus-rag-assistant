@@ -49,10 +49,20 @@ class AdminLoginRequest(BaseModel):
 @auth_router.post("/authenticate")
 async def authenticate_admin(body: AdminLoginRequest):
     """Check administrator credentials configured on the backend only."""
-    username_ok = hmac.compare_digest(body.username, settings.admin_username)
-    password_ok = hmac.compare_digest(body.password, settings.admin_password)
-    if not settings.admin_username or not settings.admin_password or not (username_ok and password_ok):
+    admin_user = (settings.admin_username or "").strip()
+    admin_pass = (settings.admin_password or "").strip()
+
+    if not admin_user or not admin_pass:
+        logger.error("Admin login failed: ADMIN_USERNAME or ADMIN_PASSWORD not configured on backend")
         raise HTTPException(401, "Invalid administrator username or password")
+
+    username_ok = hmac.compare_digest(body.username.strip(), admin_user)
+    password_ok = hmac.compare_digest(body.password, admin_pass)
+    if not (username_ok and password_ok):
+        logger.warning(f"Admin login failed: invalid credentials for '{body.username.strip()}'")
+        raise HTTPException(401, "Invalid administrator username or password")
+
+    logger.info(f"Admin authenticated successfully: '{admin_user}'")
     return {"authenticated": True, "token": create_admin_token(int(time.time()))}
 
 

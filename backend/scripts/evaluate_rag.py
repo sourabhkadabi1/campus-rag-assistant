@@ -215,12 +215,14 @@ def run_test(client: httpx.Client, base_url: str, tc: TestCase, verbose: bool) -
     try:
         with client.stream("POST", f"{base_url}/ask", json=payload, headers=headers) as resp:
             if resp.status_code != 200:
+                body_bytes = resp.read()
+                err_msg = body_bytes.decode("utf-8", errors="replace")[:200]
                 return TestResult(
                     name=tc.name,
                     category=tc.category,
                     passed=False,
                     duration_ms=int((time.time() - start) * 1000),
-                    details=f"HTTP {resp.status_code}",
+                    details=f"HTTP {resp.status_code}: {err_msg}",
                 )
 
             current_event = None
@@ -363,6 +365,10 @@ def main():
         "--category",
         help="Run only tests in this category",
     )
+    parser.add_argument(
+        "--subject",
+        help="Subject name to use for queries (default: auto-detected from /subjects)",
+    )
     args = parser.parse_args()
 
     tests = TESTS
@@ -383,6 +389,30 @@ def main():
         print(f"  ✗ Cannot reach backend: {exc}")
         print("    Start it with: uvicorn app.main:app --app-dir backend --port 8000")
         sys.exit(1)
+
+    # Detect active subject from /subjects
+    active_subject = args.subject
+    try:
+        sub_resp = httpx.get(
+            f"{args.url}/subjects",
+            headers={"X-Semester": "3", "X-Department": "CSE"},
+            timeout=5.0,
+        )
+        if sub_resp.status_code == 200:
+            available = sub_resp.json().get("subjects", [])
+            print(f"  Available CSE Sem 3 subjects in DB: {available}")
+            if not active_subject and available:
+                active_subject = available[0]
+                print(f"  Auto-selected subject for evaluation: '{active_subject}'")
+            elif not available and not active_subject:
+                print("  ⚠️ No indexed subjects found in DB for CSE Semester 3.")
+                print("     Make sure to upload at least one document via the Admin UI, or specify --subject <name>.")
+    except Exception as e:
+        print(f"  Warning: could not query /subjects: {e}")
+
+    if active_subject:
+        for tc in tests:
+            tc.subject = active_subject
 
     results: list[TestResult] = []
     with httpx.Client(timeout=90.0) as client:

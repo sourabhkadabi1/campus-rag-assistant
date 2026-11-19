@@ -29,9 +29,11 @@ logger = logging.getLogger(__name__)
 
 def create_admin_token(timestamp: int) -> str:
     """Generate an HMAC-signed admin session token."""
-    payload = f"{settings.admin_username}:{timestamp}"
+    admin_user = (settings.admin_username or "").strip()
+    admin_pass = (settings.admin_password or "").strip()
+    payload = f"{admin_user}:{timestamp}"
     signature = hmac.new(
-        settings.admin_password.encode(), payload.encode(), hashlib.sha256
+        admin_pass.encode(), payload.encode(), hashlib.sha256
     ).hexdigest()
     return f"{timestamp}.{signature}"
 
@@ -50,9 +52,12 @@ async def require_admin(request: Request) -> None:
     except (ValueError, AttributeError):
         raise HTTPException(401, "Administrator authentication required")
 
+    admin_user = (settings.admin_username or "").strip()
+    admin_pass = (settings.admin_password or "").strip()
+
     if (
-        not settings.admin_username
-        or not settings.admin_password
+        not admin_user
+        or not admin_pass
         or abs(int(time.time()) - timestamp) > 8 * 60 * 60
     ):
         raise HTTPException(401, "Administrator session expired")
