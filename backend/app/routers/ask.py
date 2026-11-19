@@ -52,6 +52,7 @@ from app.services.quota import (
     should_use_retrieval_only,
 )
 from app.services.abuse import check_user_rate_limit
+from app.services.security import detect_injection_markers
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["ask"])
@@ -331,6 +332,14 @@ async def ask(request: Request, body: AskRequest):
                 f"Rate limit exceeded: {count} requests in the last minute. "
                 "Please wait before trying again.",
             )
+
+    # ── Prompt-injection detection (logging only) ─────────
+    if detect_injection_markers(body.question):
+        logger.warning(
+            "Possible prompt-injection attempt from user=%s question=%.120r",
+            user_id or "anon",
+            body.question,
+        )
 
     question = body.question
     session_id = body.session_id

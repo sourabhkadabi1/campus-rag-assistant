@@ -13,6 +13,7 @@ from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
 from app.database import execute, fetch, fetchrow, fetchval
+from app.services.security import verify_session_ownership
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/chat", tags=["chat"])
@@ -79,28 +80,27 @@ async def list_sessions(
 
 
 @router.get("/sessions/{session_id}")
-async def get_session(session_id: str):
-    """Get a single chat session."""
-    row = await fetchrow(
-        "SELECT * FROM chat_sessions WHERE id = $1", session_id
-    )
-    if not row:
-        raise HTTPException(404, "Session not found")
-    return dict(row)
+async def get_session(request: Request, session_id: str):
+    """Get a single chat session. Requires ownership."""
+    user_id = request.headers.get("X-User-Id")
+    if not user_id:
+        raise HTTPException(400, "Missing X-User-Id header")
+    session = await verify_session_ownership(session_id, user_id)
+    return session
 
 
 @router.get("/sessions/{session_id}/messages")
 async def get_messages(
+    request: Request,
     session_id: str,
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
 ):
-    """Get messages for a chat session, oldest first."""
-    session = await fetchrow(
-        "SELECT id FROM chat_sessions WHERE id = $1", session_id
-    )
-    if not session:
-        raise HTTPException(404, "Session not found")
+    """Get messages for a chat session, oldest first. Requires ownership."""
+    user_id = request.headers.get("X-User-Id")
+    if not user_id:
+        raise HTTPException(400, "Missing X-User-Id header")
+    await verify_session_ownership(session_id, user_id)
 
     rows = await fetch(
         """SELECT id, role, content, citations, model_used,
@@ -127,13 +127,12 @@ async def get_messages(
 
 
 @router.post("/sessions/{session_id}/messages")
-async def add_message(session_id: str, body: AddMessageRequest):
-    """Add a message to a chat session."""
-    session = await fetchrow(
-        "SELECT id FROM chat_sessions WHERE id = $1", session_id
-    )
-    if not session:
-        raise HTTPException(404, "Session not found")
+async def add_message(request: Request, session_id: str, body: AddMessageRequest):
+    """Add a message to a chat session. Requires ownership."""
+    user_id = request.headers.get("X-User-Id")
+    if not user_id:
+        raise HTTPException(400, "Missing X-User-Id header")
+    await verify_session_ownership(session_id, user_id)
 
     msg_id = str(uuid.uuid4())
     citations_json = (
@@ -158,8 +157,12 @@ async def add_message(session_id: str, body: AddMessageRequest):
 
 
 @router.delete("/sessions/{session_id}")
-async def delete_session(session_id: str):
-    """Delete a chat session and all its messages (cascaded by FK)."""
+async def delete_session(request: Request, session_id: str):
+    """Delete a chat session and all its messages. Requires ownership."""
+    user_id = request.headers.get("X-User-Id")
+    if not user_id:
+        raise HTTPException(400, "Missing X-User-Id header")
+    await verify_session_ownership(session_id, user_id)
     result = await execute(
         "DELETE FROM chat_sessions WHERE id = $1", session_id
     )

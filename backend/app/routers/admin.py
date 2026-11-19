@@ -5,11 +5,10 @@ budget guard management, margin dashboard, premium toggle, cost tracking.
 
 from __future__ import annotations
 
+import hmac
 import json
 import logging
 import os
-import hashlib
-import hmac
 import time
 import uuid
 from pathlib import Path
@@ -29,31 +28,16 @@ from app.models import (
     MarginDashboardResponse,
 )
 from app.services.ingestion import ingest_document
+from app.services.security import (
+    create_admin_token,
+    require_admin,
+    sanitize_filename,
+    validate_metadata_field,
+    validate_pdf_bytes,
+)
 
 logger = logging.getLogger(__name__)
 auth_router = APIRouter(prefix="/admin", tags=["admin-auth"])
-
-
-def _admin_token(timestamp: int) -> str:
-    payload = f"{settings.admin_username}:{timestamp}"
-    signature = hmac.new(settings.admin_password.encode(), payload.encode(), hashlib.sha256).hexdigest()
-    return f"{timestamp}.{signature}"
-
-
-async def require_admin(request: Request) -> None:
-    token = request.headers.get("Authorization", "").removeprefix("Bearer ")
-    try:
-        timestamp_text, signature = token.split(".", 1)
-        timestamp = int(timestamp_text)
-    except (ValueError, AttributeError):
-        raise HTTPException(401, "Administrator authentication required")
-    if not settings.admin_username or not settings.admin_password or abs(int(time.time()) - timestamp) > 8 * 60 * 60:
-        raise HTTPException(401, "Administrator session expired")
-    expected = _admin_token(timestamp).split(".", 1)[1]
-    if not hmac.compare_digest(signature, expected):
-        raise HTTPException(401, "Administrator authentication required")
-
-
 router = APIRouter(prefix="/admin", tags=["admin"], dependencies=[Depends(require_admin)])
 
 
@@ -69,7 +53,7 @@ async def authenticate_admin(body: AdminLoginRequest):
     password_ok = hmac.compare_digest(body.password, settings.admin_password)
     if not settings.admin_username or not settings.admin_password or not (username_ok and password_ok):
         raise HTTPException(401, "Invalid administrator username or password")
-    return {"authenticated": True, "token": _admin_token(int(time.time()))}
+    return {"authenticated": True, "token": create_admin_token(int(time.time()))}
 
 
 # ── Upload ────────────────────────────────────────────────────────
@@ -91,11 +75,16 @@ async def upload_document(
     Upload a PDF and kick off background ingestion.
     Returns immediately with ingestion_status='queued'.
     """
-    # ── Validate ──────────────────────────────────────────
+    # ── Validate filename ─────────────────────────────────
     if not file.filename or not file.filename.lower().endswith(".pdf"):
         raise HTTPException(400, "Only PDF files are accepted")
 
     content = await file.read()
+
+    # ── Validate PDF magic bytes (defence-in-depth) ───────
+    if not validate_pdf_bytes(content):
+        raise HTTPException(400, "File does not appear to be a valid PDF")
+
     if len(content) > settings.max_upload_bytes:
         raise HTTPException(
             413,
@@ -105,13 +94,24 @@ async def upload_document(
     if not (1 <= semester <= 8):
         raise HTTPException(400, "Semester must be between 1 and 8")
 
-    # ── Save file ─────────────────────────────────────────
+    # ── Sanitize metadata fields ──────────────────────────
+    department = validate_metadata_field(department, "department")
+    subject = validate_metadata_field(subject, "subject")
+    academic_year = validate_metadata_field(academic_year, "academic_year")
+
+    # ── Save file with sanitized name ─────────────────────
     upload_dir = Path(settings.upload_dir)
     upload_dir.mkdir(parents=True, exist_ok=True)
 
-    safe_name = f"{uuid.uuid4().hex}_{file.filename}"
+    clean_original = sanitize_filename(file.filename)
+    safe_name = f"{uuid.uuid4().hex}_{clean_original}"
     file_path = upload_dir / safe_name
     file_path.write_bytes(content)
+
+    logger.info(
+        "PDF upload accepted: %s (%d bytes) dept=%s sem=%d subject=%s",
+        clean_original, len(content), department, semester, subject,
+    )
 
     # ── Insert DB record ──────────────────────────────────
     doc_id = str(uuid.uuid4())
@@ -121,7 +121,7 @@ async def upload_document(
             subject, academic_year, doc_type, unit_no, is_active,
             file_path, file_size_bytes, ingestion_status)
            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,'queued')""",
-        doc_id, safe_name, file.filename, department, semester,
+        doc_id, safe_name, clean_original, department, semester,
         subject, academic_year, doc_type.value, unit_no, is_active,
         str(file_path), len(content),
     )

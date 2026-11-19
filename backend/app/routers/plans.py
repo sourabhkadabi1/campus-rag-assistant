@@ -153,7 +153,7 @@ async def update_plan(plan_name: str, body: PlanUpdateRequest):
 # ── Admin: delete plan ───────────────────────────────────────────
 
 
-@router.delete("/admin/plans/{plan_name}")
+@router.delete("/admin/plans/{plan_name}", dependencies=[Depends(require_admin)])
 async def delete_plan(plan_name: str):
     """Delete a plan (admin only). Cannot delete the default plan."""
     existing = await fetchrow(
@@ -184,7 +184,7 @@ async def delete_plan(plan_name: str):
 # ── Admin: grant plan manually ───────────────────────────────────
 
 
-@router.post("/admin/plans/grant")
+@router.post("/admin/plans/grant", dependencies=[Depends(require_admin)])
 async def grant_plan(body: PlanGrantRequest):
     """
     Manually grant a plan to one or more users (admin only).
