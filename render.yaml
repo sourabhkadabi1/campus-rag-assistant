@@ -1,0 +1,50 @@
+# ── Render Blueprint ────────────────────────────────────────────
+# Deploy with: render blueprint apply
+# Docs: https://render.com/docs/blueprint-spec
+
+services:
+  - type: web
+    name: pesu-rag-backend
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    repo: https://github.com/YOUR_ORG/pesu-ai  # ← update
+    branch: main
+
+    healthCheckPath: /health
+    autoDeploy: true
+
+    envVars:
+      - key: DATABASE_URL
+        sync: false                       # set manually in Render dashboard
+      - key: GEMINI_API_KEY_FREE
+        sync: false
+      - key: GEMINI_API_KEY_PAID
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: ADMIN_USERNAME
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: RAZORPAY_KEY_ID
+        sync: false
+      - key: RAZORPAY_KEY_SECRET
+        sync: false
+      - key: RAZORPAY_WEBHOOK_SECRET
+        sync: false
+      - key: SENTRY_DSN
+        sync: false
+      - key: LOG_FORMAT
+        value: json
+      - key: ENVIRONMENT
+        value: production
+      - key: PORT
+        value: "8000"
+
+    disk:
+      name: uploads
+      mountPath: /app/uploads
+      sizeGB: 1

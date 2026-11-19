@@ -8,7 +8,7 @@ import json
 import logging
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 
 from app.database import execute, fetch, fetchrow, fetchval
 from app.models import (
@@ -18,6 +18,7 @@ from app.models import (
     PlanUpdateRequest,
 )
 from app.services.payment import grant_plan_manually
+from app.services.security import require_admin
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["plans"])
@@ -57,7 +58,7 @@ async def list_plans():
 # ── Admin: create plan ───────────────────────────────────────────
 
 
-@router.post("/admin/plans", response_model=PlanResponse, status_code=201)
+@router.post("/admin/plans", response_model=PlanResponse, status_code=201, dependencies=[Depends(require_admin)])
 async def create_plan(body: PlanCreateRequest):
     """Create a new subscription plan (admin only)."""
     existing = await fetchval(
@@ -98,7 +99,7 @@ async def create_plan(body: PlanCreateRequest):
 # ── Admin: update plan ───────────────────────────────────────────
 
 
-@router.put("/admin/plans/{plan_name}", response_model=PlanResponse)
+@router.put("/admin/plans/{plan_name}", response_model=PlanResponse, dependencies=[Depends(require_admin)])
 async def update_plan(plan_name: str, body: PlanUpdateRequest):
     """Update an existing subscription plan (admin only)."""
     existing = await fetchrow(

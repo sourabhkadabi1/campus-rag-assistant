@@ -1,0 +1,41 @@
+# ── Fly.io configuration ────────────────────────────────────────
+# Deploy with: fly deploy --config fly.toml --dockerfile backend/Dockerfile
+# Docs: https://fly.io/docs/reference/configuration/
+
+app = "pesu-rag-backend"
+primary_region = "bom"           # Mumbai — closest to PESU students
+
+[build]
+  dockerfile = "backend/Dockerfile"
+
+[env]
+  LOG_FORMAT = "json"
+  ENVIRONMENT = "production"
+  PORT = "8000"
+
+[http_service]
+  internal_port = 8000
+  force_https = true
+  auto_stop_machines = false     # keep-alive: never sleep
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [http_service.concurrency]
+    type = "requests"
+    soft_limit = 50
+    hard_limit = 100
+
+[[http_service.checks]]
+  grace_period = "30s"
+  interval = "30s"
+  method = "GET"
+  path = "/health"
+  timeout = "5s"
+
+[mounts]
+  source = "uploads"
+  destination = "/app/uploads"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"

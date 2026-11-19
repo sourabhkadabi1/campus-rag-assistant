@@ -191,6 +191,12 @@ class Settings(BaseSettings):
         description="Max requests per minute per user (abuse protection).",
     )
 
+    # ── Logging / Error tracking / Deploy ─────────────────
+    log_format: str = Field(default="text", alias="LOG_FORMAT")
+    log_level: str = Field(default="INFO", alias="LOG_LEVEL")
+    sentry_dsn: str = Field(default="", alias="SENTRY_DSN")
+    environment: str = Field(default="development", alias="ENVIRONMENT")
+
     # ── Backward compatibility aliases ───────────────────
     max_output_tokens: int = Field(default=800, alias="MAX_OUTPUT_TOKENS")
     max_output_tokens_detailed: int = Field(default=2000, alias="MAX_OUTPUT_TOKENS_DETAILED")

@@ -13,14 +13,15 @@ from __future__ import annotations
 import logging
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from app.config import settings
 from app.services import model_verifier, rate_counter
+from app.services.security import require_admin
 
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/admin/models", tags=["admin-models"])
+router = APIRouter(prefix="/admin/models", tags=["admin-models"], dependencies=[Depends(require_admin)])
 
 
 # ── Pydantic request / response models ───────────────────────────
