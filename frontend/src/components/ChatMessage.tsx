@@ -46,9 +46,21 @@ export function ChatMessage({ message }: ChatMessageProps) {
 
   if (!isAssistant) {
     return (
-      <div className="flex justify-end gap-3 max-w-4xl mx-auto w-full group">
-        <div className="max-w-[85%] sm:max-w-[75%] rounded-2xl rounded-tr-sm p-4 bg-primary text-primary-foreground shadow-md">
-          <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.content}</p>
+      <div className="flex justify-end items-start gap-3 max-w-4xl mx-auto w-full group">
+        <div className="relative max-w-[85%] sm:max-w-[75%] rounded-2xl rounded-tr-sm p-4 bg-primary text-primary-foreground shadow-md">
+          <p className="text-sm leading-relaxed whitespace-pre-wrap pr-8">{message.content}</p>
+          <button
+            onClick={handleCopyText}
+            className="absolute top-2.5 right-2.5 p-1.5 rounded-lg text-primary-foreground/75 hover:text-primary-foreground hover:bg-black/20 transition-all opacity-80 sm:opacity-0 sm:group-hover:opacity-100 focus:opacity-100"
+            title={copied ? "Copied!" : "Copy question"}
+            aria-label="Copy question"
+          >
+            {copied ? (
+              <Check className="w-3.5 h-3.5 text-white" />
+            ) : (
+              <Copy className="w-3.5 h-3.5" />
+            )}
+          </button>
         </div>
         <div className="w-8 h-8 rounded-full bg-secondary text-foreground flex items-center justify-center shrink-0 border border-border mt-0.5">
           <User className="w-4 h-4 text-muted-foreground" />
@@ -173,13 +185,17 @@ export function ChatMessage({ message }: ChatMessageProps) {
               </ReactMarkdown>
 
               {message.isStreaming && (
-                <span className="inline-block w-1.5 h-4 ml-1 bg-primary  align-middle" />
+                <span className="inline-block w-1.5 h-4 ml-1 bg-primary align-middle animate-pulse" />
               )}
             </div>
-          ) : (
-            <div className="flex items-center gap-2 text-xs text-muted-foreground  py-2">
+          ) : message.isStreaming ? (
+            <div className="flex items-center gap-2 text-xs text-muted-foreground py-2">
               <Sparkles className="w-4 h-4 text-primary animate-spin" />
               <span>Analyzing semester documents and reasoning…</span>
+            </div>
+          ) : (
+            <div className="text-xs text-muted-foreground italic py-2">
+              *(Generation stopped)*
             </div>
           )}
 

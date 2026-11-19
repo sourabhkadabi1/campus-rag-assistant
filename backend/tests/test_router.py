@@ -655,13 +655,20 @@ async def test_mark_cooldown_500(fresh_store):
 # ╚════════════════════════════════════════════════════════════════╝
 
 
+def _admin_headers() -> dict:
+    import time
+    from app.services.security import create_admin_token
+    token = create_admin_token(int(time.time()))
+    return {"Authorization": f"Bearer {token}"}
+
+
 def test_admin_models_status_endpoint(fresh_store):
     """GET /admin/models/status returns status list for configured models."""
     from fastapi.testclient import TestClient
     from app.main import app
 
     client = TestClient(app)
-    resp = client.get("/admin/models/status")
+    resp = client.get("/admin/models/status", headers=_admin_headers())
     assert resp.status_code == 200
     data = resp.json()
     assert isinstance(data, list)
@@ -685,12 +692,12 @@ def test_admin_models_toggle_endpoint(fresh_store):
     model = "gemini-3.5-flash-lite"
 
     # Disable
-    resp = client.post(f"/admin/models/{model}/toggle", json={"enabled": False})
+    resp = client.post(f"/admin/models/{model}/toggle", json={"enabled": False}, headers=_admin_headers())
     assert resp.status_code == 200
     assert resp.json()["is_enabled"] is False
 
     # Enable
-    resp = client.post(f"/admin/models/{model}/toggle", json={"enabled": True})
+    resp = client.post(f"/admin/models/{model}/toggle", json={"enabled": True}, headers=_admin_headers())
     assert resp.status_code == 200
     assert resp.json()["is_enabled"] is True
 
@@ -703,7 +710,7 @@ def test_admin_models_clear_cooldown_endpoint(fresh_store):
     client = TestClient(app)
     model = "gemini-3.5-flash-lite"
 
-    resp = client.post(f"/admin/models/{model}/clear-cooldown")
+    resp = client.post(f"/admin/models/{model}/clear-cooldown", headers=_admin_headers())
     assert resp.status_code == 200
     assert resp.json()["cooldown_cleared"] is True
 
@@ -723,7 +730,7 @@ def test_admin_models_reverify_endpoint(fresh_store):
         new_callable=AsyncMock,
         return_value=["openai/gpt-oss-20b"],
     ):
-        resp = client.post("/admin/models/reverify")
+        resp = client.post("/admin/models/reverify", headers=_admin_headers())
         assert resp.status_code == 200
         data = resp.json()
         assert isinstance(data, list)

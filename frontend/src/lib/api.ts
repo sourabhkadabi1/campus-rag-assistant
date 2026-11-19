@@ -90,6 +90,10 @@ export async function askQuestionStream(
 ): Promise<void> {
   const headers = getHeaders(profile);
 
+  if (abortSignal?.aborted) {
+    return;
+  }
+
   const response = await fetch(`${BASE_URL}/ask`, {
     method: "POST",
     headers,
@@ -104,6 +108,7 @@ export async function askQuestionStream(
   });
 
   if (!response.ok) {
+    if (abortSignal?.aborted) return;
     let errorDetail = `Request failed (${response.status})`;
     try {
       const err = await response.json();
@@ -122,57 +127,94 @@ export async function askQuestionStream(
   const decoder = new TextDecoder();
   let buffer = "";
 
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
+  const onAbort = () => {
+    try {
+      reader.cancel();
+    } catch {}
+  };
 
-    buffer += decoder.decode(value, { stream: true });
-    const lines = buffer.split(/\r?\n/);
-    buffer = lines.pop() ?? "";
+  if (abortSignal) {
+    if (abortSignal.aborted) {
+      onAbort();
+      return;
+    }
+    abortSignal.addEventListener("abort", onAbort, { once: true });
+  }
 
-    let currentEvent = "message";
+  try {
+    while (true) {
+      if (abortSignal?.aborted) {
+        onAbort();
+        break;
+      }
 
-    for (const line of lines) {
-      if (line.startsWith("event:")) {
-        currentEvent = line.replace(/^event:\s*/, "").trim();
-      } else if (line.startsWith("data:")) {
-        const rawData = line.replace(/^data:\s*/, "").trim();
-        if (!rawData) continue;
+      const { done, value } = await reader.read();
+      if (done || abortSignal?.aborted) break;
 
-        try {
-          const parsed = JSON.parse(rawData);
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split(/\r?\n/);
+      buffer = lines.pop() ?? "";
 
-          switch (currentEvent) {
-            case "filter":
-              callbacks.onFilter?.(parsed);
-              break;
-            case "route":
-              callbacks.onRoute?.(parsed.route);
-              break;
-            case "token":
-              if (parsed.text) callbacks.onToken?.(parsed.text);
-              break;
-            case "queue":
-              callbacks.onQueue?.(parsed.position, parsed.estimated_seconds);
-              break;
-            case "citations":
-              if (parsed.citations) callbacks.onCitations?.(parsed.citations);
-              break;
-            case "quota":
-              callbacks.onDone?.({ quota: parsed });
-              break;
-            case "done":
-              callbacks.onDone?.(parsed);
-              break;
-            case "error":
-              callbacks.onError?.(parsed.error || "An error occurred");
-              break;
+      let currentEvent = "message";
+
+      for (const line of lines) {
+        if (abortSignal?.aborted) break;
+
+        if (line.startsWith("event:")) {
+          currentEvent = line.replace(/^event:\s*/, "").trim();
+        } else if (line.startsWith("data:")) {
+          const rawData = line.replace(/^data:\s*/, "").trim();
+          if (!rawData) continue;
+
+          try {
+            const parsed = JSON.parse(rawData);
+
+            if (abortSignal?.aborted) break;
+
+            switch (currentEvent) {
+              case "filter":
+                callbacks.onFilter?.(parsed);
+                break;
+              case "route":
+                callbacks.onRoute?.(parsed.route);
+                break;
+              case "token":
+                if (parsed.text) callbacks.onToken?.(parsed.text);
+                break;
+              case "queue":
+                callbacks.onQueue?.(parsed.position, parsed.estimated_seconds);
+                break;
+              case "citations":
+                if (parsed.citations) callbacks.onCitations?.(parsed.citations);
+                break;
+              case "quota":
+                callbacks.onDone?.({ quota: parsed });
+                break;
+              case "done":
+                callbacks.onDone?.(parsed);
+                break;
+              case "error":
+                callbacks.onError?.(parsed.error || "An error occurred");
+                break;
+            }
+          } catch (e) {
+            console.warn("Failed to parse SSE JSON:", rawData, e);
           }
-        } catch (e) {
-          console.warn("Failed to parse SSE JSON:", rawData, e);
         }
       }
     }
+  } catch (err: any) {
+    if (err.name === "AbortError" || abortSignal?.aborted) {
+      return; // Handled user abortion
+    }
+    throw err;
+  } finally {
+    if (abortSignal) {
+      abortSignal.removeEventListener("abort", onAbort);
+    }
+    try {
+      reader.releaseLock();
+    } catch {}
   }
 }
 

@@ -759,6 +759,10 @@ async def ask(request: Request, body: AskRequest):
                 max_output_tokens=2000 if previous_paper_request else profile_max_output,
                 profile_chunks=12 if previous_paper_request else profile_chunks,
             ):
+                if await request.is_disconnected():
+                    logger.info("Client disconnected from /ask stream — stopping generation")
+                    break
+
                 if event["type"] == "model_selected":
                     model_used = event["model_id"]
                     provider = event["provider"]

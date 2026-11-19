@@ -186,6 +186,7 @@ export default function StudentChatPage() {
             setQueueInfo({ position, estimatedSeconds });
           },
           onToken(token) {
+            if (abortController.signal.aborted) return;
             setQueueInfo(null); // token received, departed queue
             accumulatedContent += token;
             setMessages((prev) =>
@@ -197,6 +198,7 @@ export default function StudentChatPage() {
             );
           },
           onCitations(citations) {
+            if (abortController.signal.aborted) return;
             accumulatedCitations = citations;
             setMessages((prev) =>
               prev.map((m) =>
@@ -205,6 +207,7 @@ export default function StudentChatPage() {
             );
           },
           onDone(doneData) {
+            if (abortController.signal.aborted) return;
             if (doneData.thinking_mode !== undefined) {
               actualThinking = doneData.thinking_mode;
             }
@@ -217,6 +220,7 @@ export default function StudentChatPage() {
             refreshQuota();
           },
           onError(error) {
+            if (abortController.signal.aborted) return;
             accumulatedContent += `\n\n⚠️ **Error:** ${error}`;
             setMessages((prev) =>
               prev.map((m) =>
@@ -230,7 +234,7 @@ export default function StudentChatPage() {
         abortController.signal
       );
     } catch (err: any) {
-      if (err.name !== "AbortError") {
+      if (err.name !== "AbortError" && !abortController.signal.aborted) {
         accumulatedContent += `\n\n⚠️ An error occurred while communicating with the assistant.`;
       }
     } finally {
@@ -238,13 +242,23 @@ export default function StudentChatPage() {
       setQueueInfo(null);
       abortControllerRef.current = null;
 
+      const wasAborted = abortController.signal.aborted;
+      let finalContent = accumulatedContent;
+      if (wasAborted) {
+        if (!finalContent) {
+          finalContent = "*(Generation stopped by user)*";
+        } else if (!finalContent.includes("*(Generation stopped)*")) {
+          finalContent = `${finalContent}\n\n*(Generation stopped)*`;
+        }
+      }
+
       // Finalize assistant message
       setMessages((prev) =>
         prev.map((m) =>
           m.id === assistantPlaceholder.id
             ? {
                 ...m,
-                content: accumulatedContent,
+                content: finalContent,
                 citations: accumulatedCitations,
                 isStreaming: false,
                 thinking_mode: actualThinking,
@@ -257,12 +271,12 @@ export default function StudentChatPage() {
       );
 
       // Record assistant response to chat history
-      if (activeSessionId && accumulatedContent) {
+      if (activeSessionId && finalContent) {
         addSessionMessage(
           activeSessionId,
           {
             role: "assistant",
-            content: accumulatedContent,
+            content: finalContent,
             citations: accumulatedCitations,
           },
           profile
@@ -275,8 +289,26 @@ export default function StudentChatPage() {
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
       abortControllerRef.current = null;
-      setIsStreaming(false);
     }
+    setIsStreaming(false);
+    setQueueInfo(null);
+
+    // Immediately stop and finalize the streaming message in the UI
+    setMessages((prev) =>
+      prev.map((m) => {
+        if (m.role === "assistant" && m.isStreaming) {
+          const content = m.content
+            ? `${m.content}\n\n*(Generation stopped)*`
+            : "*(Generation stopped by user)*";
+          return {
+            ...m,
+            content,
+            isStreaming: false,
+          };
+        }
+        return m;
+      })
+    );
   };
 
   return (
