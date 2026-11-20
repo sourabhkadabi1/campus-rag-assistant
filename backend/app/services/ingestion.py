@@ -9,7 +9,9 @@ unit-testable without a database.
 from __future__ import annotations
 
 import logging
+import os
 import re
+import shutil
 import uuid
 from dataclasses import dataclass, field
 from typing import Optional
@@ -21,6 +23,39 @@ from app.database import execute, get_pool
 from app.services.embeddings import get_embeddings_batch
 
 logger = logging.getLogger(__name__)
+
+_tesseract_available: Optional[bool] = None
+
+
+def is_tesseract_available() -> bool:
+    """Check if tesseract executable is installed and available."""
+    global _tesseract_available
+    if _tesseract_available is not None:
+        return _tesseract_available
+
+    tesseract_cmd = shutil.which("tesseract")
+    if not tesseract_cmd and os.name == "nt":
+        for candidate in [
+            r"C:\Program Files\Tesseract-OCR\tesseract.exe",
+            r"C:\Program Files (x86)\Tesseract-OCR\tesseract.exe",
+            os.path.expandvars(r"%LOCALAPPDATA%\Tesseract-OCR\tesseract.exe"),
+        ]:
+            if os.path.exists(candidate):
+                try:
+                    import pytesseract
+                    pytesseract.pytesseract.tesseract_cmd = candidate
+                    tesseract_cmd = candidate
+                    break
+                except Exception:
+                    pass
+
+    _tesseract_available = tesseract_cmd is not None
+    if not _tesseract_available:
+        logger.info(
+            "Tesseract binary not installed on host — OCR fallback disabled. "
+            "Direct digital text extraction will be used."
+        )
+    return _tesseract_available
 
 
 # ╔════════════════════════════════════════════════════════════════╗
@@ -111,35 +146,63 @@ def _line_font_size(chars: list, line_text: str) -> Optional[float]:
 
 def extract_pages(pdf_path: str) -> list[PageContent]:
     """
-    Extract text page-by-page with pdfplumber.
-    Falls back to pytesseract OCR when a page yields < 50 chars.
+    Extract text page-by-page with pdfplumber (and PyMuPDF fast fallback).
+    Falls back to pytesseract OCR only when a page yields 0 text AND tesseract is installed.
     """
     pages: list[PageContent] = []
+    ocr_enabled = is_tesseract_available()
 
-    with pdfplumber.open(pdf_path) as pdf:
-        for i, page in enumerate(pdf.pages):
-            page_num = i + 1
-            text = page.extract_text() or ""
-            chars = page.chars if hasattr(page, "chars") else []
-            is_ocr = False
+    # Optional fitz doc for fast fallback on empty pages
+    fitz_doc = None
+    try:
+        import fitz
+        fitz_doc = fitz.open(pdf_path)
+    except Exception:
+        fitz_doc = None
 
-            if len(text.strip()) < 50:
-                ocr_text = _ocr_page(page, pdf_path, page_num)
-                if ocr_text and len(ocr_text.strip()) > len(text.strip()):
-                    text = ocr_text
-                    is_ocr = True
+    try:
+        with pdfplumber.open(pdf_path) as pdf:
+            for i, page in enumerate(pdf.pages):
+                page_num = i + 1
+                text = page.extract_text() or ""
+                chars = page.chars if hasattr(page, "chars") else []
+                is_ocr = False
 
-            pages.append(PageContent(page_num=page_num, text=text,
-                                     is_ocr=is_ocr, chars=chars))
+                # If pdfplumber returned no text, check PyMuPDF before attempting OCR
+                if not text.strip() and fitz_doc and i < len(fitz_doc):
+                    try:
+                        fitz_text = fitz_doc[i].get_text() or ""
+                        if fitz_text.strip():
+                            text = fitz_text
+                    except Exception:
+                        pass
+
+                # Fallback to OCR ONLY when page yields zero text AND tesseract binary is present
+                if not text.strip() and ocr_enabled:
+                    ocr_text = _ocr_page(page, pdf_path, page_num)
+                    if ocr_text and ocr_text.strip():
+                        text = ocr_text
+                        is_ocr = True
+
+                pages.append(PageContent(page_num=page_num, text=text,
+                                         is_ocr=is_ocr, chars=chars))
+    finally:
+        if fitz_doc:
+            try:
+                fitz_doc.close()
+            except Exception:
+                pass
 
     return pages
 
 
 def _ocr_page(page, pdf_path: str, page_num: int) -> str:
-    """OCR a single page via pytesseract. Returns empty string on failure."""
+    """OCR a single page via pytesseract if available. Returns empty string on failure."""
+    if not is_tesseract_available():
+        return ""
     try:
         import pytesseract  # type: ignore
-        img = page.to_image(resolution=300)
+        img = page.to_image(resolution=200)
         return pytesseract.image_to_string(img.original)
     except Exception as exc:
         logger.warning("OCR failed for page %d of %s: %s", page_num, pdf_path, exc)
