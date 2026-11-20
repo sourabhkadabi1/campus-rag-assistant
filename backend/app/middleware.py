@@ -37,7 +37,15 @@ class RequestIdMiddleware(BaseHTTPMiddleware):
         request.state.request_id = request_id
 
         start = time.time()
-        response = await call_next(request)
+        try:
+            response = await call_next(request)
+        except Exception as exc:
+            logging.getLogger("app.middleware").exception("Unhandled error processing %s %s: %s", request.method, request.url.path, exc)
+            from starlette.responses import JSONResponse
+            response = JSONResponse(
+                {"detail": f"Internal server error: {exc}"},
+                status_code=500,
+            )
         duration_ms = int((time.time() - start) * 1000)
 
         response.headers["X-Request-ID"] = request_id

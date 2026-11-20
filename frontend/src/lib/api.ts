@@ -14,27 +14,77 @@ import {
 } from "./types";
 
 const BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
+const ADMIN_TOKEN_KEY = "pesu_admin_session_token";
+
 let adminSessionToken = "";
 
+export function getAdminToken(): string {
+  if (adminSessionToken) return adminSessionToken;
+  if (typeof window !== "undefined") {
+    try {
+      const stored = sessionStorage.getItem(ADMIN_TOKEN_KEY) || localStorage.getItem(ADMIN_TOKEN_KEY);
+      if (stored) {
+        adminSessionToken = stored;
+        return stored;
+      }
+    } catch {}
+  }
+  return "";
+}
+
+export function setAdminSessionToken(token: string): void {
+  adminSessionToken = token;
+  if (typeof window !== "undefined") {
+    try {
+      sessionStorage.setItem(ADMIN_TOKEN_KEY, token);
+      localStorage.setItem(ADMIN_TOKEN_KEY, token);
+    } catch {}
+  }
+}
+
 export async function authenticateAdmin(username: string, password: string): Promise<void> {
-  const response = await fetch(`${BASE_URL}/admin/authenticate`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ username, password }),
-  });
-  if (!response.ok) throw new Error("Invalid administrator username or password");
+  let response: Response;
+  try {
+    response = await fetch(`${BASE_URL}/admin/authenticate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username, password }),
+    });
+  } catch (err: any) {
+    throw new Error(`Cannot connect to backend server at ${BASE_URL}. Ensure uvicorn is running.`);
+  }
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.detail || "Invalid administrator username or password");
+  }
   const data = await response.json();
-  adminSessionToken = data.token;
+  setAdminSessionToken(data.token);
 }
 
 export function clearAdminSession(): void {
   adminSessionToken = "";
+  if (typeof window !== "undefined") {
+    try {
+      sessionStorage.removeItem(ADMIN_TOKEN_KEY);
+      localStorage.removeItem(ADMIN_TOKEN_KEY);
+    } catch {}
+  }
 }
 
-function adminFetch(path: string, init: RequestInit = {}): Promise<Response> {
+export async function adminFetch(path: string, init: RequestInit = {}): Promise<Response> {
   const headers = new Headers(init.headers);
-  if (adminSessionToken) headers.set("Authorization", `Bearer ${adminSessionToken}`);
-  return fetch(`${BASE_URL}${path}`, { ...init, headers });
+  const token = getAdminToken();
+  if (token) headers.set("Authorization", `Bearer ${token}`);
+  try {
+    return await fetch(`${BASE_URL}${path}`, { ...init, headers });
+  } catch (err: any) {
+    if (err.name === "TypeError" || err.message?.includes("fetch")) {
+      throw new Error(
+        `Cannot connect to backend at ${BASE_URL}. Please ensure the backend server is running and accessible.`
+      );
+    }
+    throw err;
+  }
 }
 
 function getHeaders(profile?: StudentProfile | null): Record<string, string> {
@@ -339,6 +389,10 @@ export async function uploadDocument(
   },
   profile?: StudentProfile
 ): Promise<DocumentItem> {
+  if (!getAdminToken()) {
+    throw new Error("Administrator session expired or not authenticated. Please sign in again.");
+  }
+
   const formData = new FormData();
   formData.append("file", file);
   formData.append("department", metadata.department);

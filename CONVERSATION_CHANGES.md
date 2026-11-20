@@ -51,6 +51,12 @@ The local frontend and backend were started. A fresh previous-year question requ
 - `backend/app/config.py`: added `log_format`, `log_level`, `sentry_dsn`, `environment` settings fields; updated `model_config["env_file"]` to include `"backend/.env"` so credentials load when running from repo root
 - Synced `ADMIN_USERNAME` and `ADMIN_PASSWORD` to root `.env` and `.env.example`
 - Hardened `authenticate_admin` and `security.py` admin token check to strip whitespace and log auth failures
+- Fixed "Failed to fetch" on document upload:
+  - Corrected `CORSMiddleware` in `backend/app/main.py`: replaced wildcard `allow_origins=["*"]` with explicit localhost and Vercel regex origins so browser CORS allows responses with `allow_credentials=True`
+  - Hardened `RequestIdMiddleware` in `backend/app/middleware.py`: wrapped dispatch in try-except so unhandled server errors return a 500 JSON response with CORS headers rather than dropping the TCP connection
+  - Persisted `adminSessionToken` in `sessionStorage` and `localStorage` in `frontend/src/lib/api.ts` to prevent token loss on component re-renders or page refreshes
+  - Added session restoration on mount in `frontend/src/app/admin/page.tsx`
+  - Replaced generic "Failed to fetch" message in `api.ts` with actionable diagnostic messages explaining backend connection status
 
 ### Still requires deployment-time action
 - Run `backend/migrations/004_phase6.sql` in Supabase SQL Editor

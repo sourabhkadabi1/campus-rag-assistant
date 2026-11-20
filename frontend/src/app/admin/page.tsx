@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import { useApp } from "@/lib/context";
-import { authenticateAdmin, clearAdminSession } from "@/lib/api";
+import { authenticateAdmin, clearAdminSession, getAdminToken } from "@/lib/api";
 import { DocumentUpload } from "@/components/admin/DocumentUpload";
 import { ModelStatusPanel } from "@/components/admin/ModelStatusPanel";
 import { MarginDashboard } from "@/components/admin/MarginDashboard";
@@ -34,6 +34,12 @@ export default function AdminPortalPage() {
   const [passwordInput, setPasswordInput] = useState("");
   const [authError, setAuthError] = useState(false);
   const [authSuccess, setAuthSuccess] = useState(false);
+
+  React.useEffect(() => {
+    if (getAdminToken() && !isAdminAuthenticated) {
+      setIsAdminAuthenticated(true);
+    }
+  }, [isAdminAuthenticated, setIsAdminAuthenticated]);
 
   const handleUnlockAdmin = async (e: React.FormEvent) => {
     e.preventDefault();

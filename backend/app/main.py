@@ -118,13 +118,20 @@ app = FastAPI(
 # Request-ID and access logging (Phase 6)
 app.add_middleware(RequestIdMiddleware)
 
-# CORS — permissive for dev; tighten in production via vercel.json headers
+# CORS — allow localhost in dev and Vercel in production
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:8000",
+        "http://127.0.0.1:8000",
+    ],
+    allow_origin_regex=r"https?://(localhost|127\.0\.0\.1|.*\.vercel\.app)(:\d+)?",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"],
 )
 
 # ── Routers ───────────────────────────────────────────────────────
