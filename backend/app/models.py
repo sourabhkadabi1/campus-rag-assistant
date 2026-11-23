@@ -279,3 +279,82 @@ class MarginDashboardResponse(BaseModel):
 class AdminSettingUpdate(BaseModel):
     """Admin request to update a setting."""
     value: str = Field(..., min_length=1)
+
+
+# ── Stage 7: Practice & Quiz Generation ──────────────────────────
+
+
+class PracticeQuestionType(str, Enum):
+    MCQ = "mcq"
+    DESCRIPTIVE = "descriptive"
+    MIXED = "mixed"
+
+
+class PracticeDifficulty(str, Enum):
+    EASY = "easy"
+    MEDIUM = "medium"
+    HARD = "hard"
+
+
+class PracticeCitation(BaseModel):
+    document_id: Optional[str] = None
+    doc_type: Optional[str] = None
+    chapter_no: Optional[int] = None
+    chapter_title: Optional[str] = None
+    unit_no: Optional[int] = None
+    page_start: Optional[int] = None
+    page_end: Optional[int] = None
+
+
+class PracticeQuestion(BaseModel):
+    id: str = Field(..., description="e.g. 'q1'")
+    type: str = Field(..., description="'mcq' or 'descriptive'")
+    question: str
+    options: Optional[list[str]] = Field(None, description="Options for MCQ: ['A) ...', 'B) ...', ...]")
+    correct_option_index: Optional[int] = Field(None, description="0-based index for MCQ")
+    model_answer: str = Field(..., description="Explanation or detailed model answer")
+    key_points: Optional[list[str]] = Field(None, description="Key concepts tested")
+    citation: Optional[PracticeCitation] = None
+
+
+class PracticeGenerateRequest(BaseModel):
+    subject: str = Field(..., min_length=1)
+    topic: Optional[str] = None
+    chapter_no: Optional[int] = Field(None, ge=1, le=50)
+    unit_no: Optional[int] = Field(None, ge=1, le=20)
+    question_type: PracticeQuestionType = Field(default=PracticeQuestionType.MCQ)
+    difficulty: PracticeDifficulty = Field(default=PracticeDifficulty.MEDIUM)
+    count: int = Field(default=5, ge=1, le=10)
+
+
+class PracticeSetResponse(BaseModel):
+    id: str
+    subject: str
+    semester: int
+    department: str
+    academic_year: str
+    topic: Optional[str] = None
+    unit_no: Optional[int] = None
+    chapter_no: Optional[int] = None
+    question_type: str
+    difficulty: str
+    questions: list[PracticeQuestion]
+    units_charged: int = 2
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class PracticeSubmitRequest(BaseModel):
+    practice_set_id: str
+    answers: dict[str, int] = Field(..., description="Mapping of question id -> selected option index")
+
+
+class PracticeSubmitResponse(BaseModel):
+    submission_id: str
+    practice_set_id: str
+    score: int
+    total: int
+    percentage: float
+    feedback: list[dict]
+

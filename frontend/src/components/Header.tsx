@@ -11,6 +11,7 @@ import {
   Sparkles,
   Shield,
   BadgeCheck,
+  BookOpenCheck,
 } from "lucide-react";
 
 export function Header() {
@@ -54,6 +55,18 @@ export function Header() {
             >
               <MessageSquare className="w-4 h-4" />
               Chat Assistant
+            </Link>
+
+            <Link
+              href="/practice"
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                pathname === "/practice"
+                  ? "bg-secondary text-primary font-semibold"
+                  : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
+              }`}
+            >
+              <BookOpenCheck className="w-4 h-4 text-primary" />
+              Practice & Quiz
             </Link>
 
             <Link

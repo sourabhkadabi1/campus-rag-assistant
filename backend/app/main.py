@@ -26,6 +26,7 @@ from app.routers import models as models_router
 from app.routers import quota as quota_router
 from app.routers import plans as plans_router
 from app.routers import payments as payments_router
+from app.routers import practice as practice_router
 
 # ── Logging setup (JSON in production, plain text in dev) ─────────
 setup_logging(
@@ -108,8 +109,8 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="College RAG Assistant",
-    version="0.6.0",
-    description="Phase 1–6: Ingestion + Query + Router + Quotas/Plans/Payments + Security/Hardening",
+    version="0.7.0",
+    description="Phase 1–7: Ingestion + Query + Router + Quotas/Plans/Payments + Security/Hardening + Practice/Quiz Generator",
     lifespan=lifespan,
 )
 
@@ -144,6 +145,7 @@ app.include_router(models_router.router)
 app.include_router(quota_router.router)
 app.include_router(plans_router.router)
 app.include_router(payments_router.router)
+app.include_router(practice_router.router)
 
 
 # ── Root ──────────────────────────────────────────────────────────
@@ -153,7 +155,7 @@ app.include_router(payments_router.router)
 async def root():
     return {
         "message": "College RAG Assistant Backend is running",
-        "version": "0.6.0",
+        "version": "0.7.0",
         "docs": "/docs",
         "health": "/health",
     }

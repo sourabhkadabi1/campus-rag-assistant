@@ -164,3 +164,74 @@ export interface BudgetGuardStatus {
   manual_retrieval_only: boolean;
   monthly_spend_cap_usd: number;
 }
+
+// ── Stage 7: Practice & Quiz ─────────────────────────────────────
+
+export interface PracticeCitation {
+  document_id?: string | null;
+  doc_type?: string | null;
+  chapter_no?: number | null;
+  chapter_title?: string | null;
+  unit_no?: number | null;
+  page_start?: number | null;
+  page_end?: number | null;
+}
+
+export interface PracticeQuestion {
+  id: string;
+  type: "mcq" | "descriptive";
+  question: string;
+  options?: string[] | null;
+  correct_option_index?: number | null;
+  model_answer: string;
+  key_points?: string[] | null;
+  citation?: PracticeCitation | null;
+}
+
+export interface PracticeSet {
+  id: string;
+  subject: string;
+  semester: number;
+  department: string;
+  academic_year: string;
+  topic?: string | null;
+  unit_no?: number | null;
+  chapter_no?: number | null;
+  question_type: "mcq" | "descriptive" | "mixed";
+  difficulty: "easy" | "medium" | "hard";
+  questions: PracticeQuestion[];
+  units_charged: number;
+  created_at: string;
+}
+
+export interface PracticeSubmitFeedback {
+  question_id: string;
+  type: "mcq" | "descriptive";
+  question: string;
+  selected_option_index?: number | null;
+  correct_option_index?: number | null;
+  is_correct?: boolean;
+  model_answer?: string;
+  key_points?: string[];
+  citation?: PracticeCitation | null;
+}
+
+export interface PracticeSubmitResponse {
+  submission_id: string;
+  practice_set_id: string;
+  score: number;
+  total: number;
+  percentage: number;
+  feedback: PracticeSubmitFeedback[];
+}
+
+export interface PracticeGenerateParams {
+  subject: string;
+  topic?: string;
+  chapter_no?: number;
+  unit_no?: number;
+  question_type?: "mcq" | "descriptive" | "mixed";
+  difficulty?: "easy" | "medium" | "hard";
+  count?: number;
+}
+

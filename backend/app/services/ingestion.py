@@ -14,6 +14,7 @@ import re
 import shutil
 import uuid
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Optional
 
 import pdfplumber
@@ -453,8 +454,21 @@ async def ingest_document(
             document_id,
         )
 
+        # Resolve PDF file path gracefully across execution roots
+        resolved_path = Path(pdf_path)
+        if not resolved_path.exists():
+            for alt in [
+                Path("backend") / pdf_path,
+                Path("..") / pdf_path,
+                Path(settings.upload_dir) / Path(pdf_path).name,
+                Path("backend") / settings.upload_dir / Path(pdf_path).name,
+            ]:
+                if alt.exists():
+                    resolved_path = alt
+                    break
+
         # 1. Extract pages
-        pages = extract_pages(pdf_path)
+        pages = extract_pages(str(resolved_path))
         total_pages = len(pages)
         await execute(
             "UPDATE documents SET total_pages=$1, updated_at=NOW() WHERE id=$2",
@@ -515,22 +529,24 @@ async def ingest_document(
                     chunk.chunk_index, chunk.token_count,
                 )
 
-            # Record in unit_chapter_map if unit is known
-            if unit_no is not None:
-                await conn.execute(
-                    """INSERT INTO unit_chapter_map
-                       (id, subject, semester, department, academic_year, unit_no, unit_title, document_id)
-                       VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
-                       ON CONFLICT DO NOTHING""",
-                    str(uuid.uuid4()), metadata["subject"], metadata["semester"],
-                    metadata["department"], metadata["academic_year"],
-                    unit_no, f"Unit {unit_no}", uuid.UUID(document_id),
-                )
+            # Record in unit_chapter_map if unit is known and chapters exist
+            if unit_no is not None and chapters:
+                for ch in chapters:
+                    if ch.chapter_no is not None:
+                        await conn.execute(
+                            """INSERT INTO unit_chapter_map
+                               (id, subject, semester, department, academic_year, unit_no, unit_title, chapter_no, chapter_title, document_id)
+                               VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+                               ON CONFLICT DO NOTHING""",
+                            str(uuid.uuid4()), metadata["subject"], metadata["semester"],
+                            metadata["department"], metadata["academic_year"],
+                            unit_no, f"Unit {unit_no}", ch.chapter_no, ch.title, uuid.UUID(document_id),
+                        )
 
         logger.info("doc %s: stored %d chunks", document_id, len(chunks))
 
-        # 6. Generate chapter summaries
-        if chapters:
+        # 6. Generate chapter summaries (textbooks only, not slide decks or previous papers)
+        if chapters and doc_type == "book":
             chapter_data = []
             for ch in chapters:
                 text = "\n\n".join(

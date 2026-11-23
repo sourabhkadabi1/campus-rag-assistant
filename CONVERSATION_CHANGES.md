@@ -59,7 +59,41 @@ The local frontend and backend were started. A fresh previous-year question requ
   - Replaced generic "Failed to fetch" message in `api.ts` with actionable diagnostic messages explaining backend connection status
 
 ### Still requires deployment-time action
-- Run `backend/migrations/004_phase6.sql` in Supabase SQL Editor
+- Run `backend/migrations/004_phase6.sql` and `backend/migrations/005_stage7_practice.sql` in Supabase SQL Editor
 - Set `SENTRY_DSN` env var on the host to enable Sentry reporting
 - Update `YOUR_ORG/pesu-ai` placeholder in `render.yaml` to your actual GitHub org/repo
 - Student identity is still header-based (`X-User-Id`); real multi-user deployment needs Supabase Auth JWT verification (documented limitation)
+
+
+## Stage 7 — Practice & Quiz Generation Engine
+
+- Added `backend/migrations/005_stage7_practice.sql`: created `practice_sets` and `practice_submissions` tables with indexes.
+- Added Stage 7 Pydantic schemas in `backend/app/models.py`:
+  - `PracticeQuestionType`, `PracticeDifficulty`, `PracticeCitation`, `PracticeQuestion`
+  - `PracticeGenerateRequest`, `PracticeSetResponse`, `PracticeSubmitRequest`, `PracticeSubmitResponse`
+- Added `backend/app/services/practice_generator.py`:
+  - Plan feature check: verifies `quiz_generation` flag in student's plan (403 if free user without feature).
+  - Atomic quota deduction (charges 2 question units; auto-refunds if no context found or generation errors).
+  - Grounded context retrieval via `hybrid_search` scoped strictly to student's department, semester, and selected subject/unit/chapter.
+  - JSON prompt construction and robust JSON cleaner for markdown code block extraction.
+  - Automatic citation linking to source textbook chapter, unit, and page numbers.
+  - Submission evaluation: calculates MCQ score, percentage, and per-question feedback.
+  - Database persistence for practice sets and submissions.
+- Added `backend/app/routers/practice.py` and registered in `backend/app/main.py`:
+  - `POST /practice/generate`: generates grounded quizzes.
+  - `POST /practice/submit`: evaluates student answers and returns detailed score.
+  - `GET /practice/history`: lists past practice sets.
+  - `GET /practice/{practice_set_id}`: retrieves a specific practice set.
+- Added `backend/tests/test_practice.py`: 13 comprehensive tests covering JSON cleanup, prompt builder, free plan gate, quota limit & refund, generation, scoring, and router endpoints (all pass; test suite total: 268 passed).
+- Frontend additions:
+  - Added types in `frontend/src/lib/types.ts` (`PracticeSet`, `PracticeQuestion`, `PracticeSubmitResponse`, etc.).
+  - Added API client methods in `frontend/src/lib/api.ts` (`generatePracticeQuiz`, `submitPracticeQuiz`, `getPracticeHistory`, `getPracticeQuizById`).
+  - Added "Practice & Quiz" navigation item in `frontend/src/components/Header.tsx`.
+  - Built interactive quiz page `frontend/src/app/practice/page.tsx`:
+    - Quiz configuration card (subject, optional topic, unit/chapter, question format, difficulty, question count).
+    - Premium upgrade banner with quick-upgrade action for free users.
+    - Interactive MCQ and descriptive test-taking UI with instant selection.
+    - Automatic grading, percentage calculation, explanation breakdown, and one-click PDF page citations.
+    - Recent practice history drawer.
+- Validated TypeScript compilation: `node frontend/node_modules/typescript/bin/tsc --project frontend/tsconfig.json --noEmit` exits 0 with zero errors.
+

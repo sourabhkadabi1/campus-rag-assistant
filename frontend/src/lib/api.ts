@@ -9,6 +9,9 @@ import {
   Message,
   ModelStatus,
   PlanItem,
+  PracticeGenerateParams,
+  PracticeSet,
+  PracticeSubmitResponse,
   QuotaRemaining,
   StudentProfile,
 } from "./types";
@@ -680,3 +683,65 @@ export async function verifyPayment(payload: {
   if (!res.ok) throw new Error("Failed to verify payment");
   return res.json();
 }
+
+// ─────────────────────────────────────────────────────────────
+// Stage 7: Practice & Quiz API
+// ─────────────────────────────────────────────────────────────
+
+export async function generatePracticeQuiz(
+  params: PracticeGenerateParams,
+  profile: StudentProfile
+): Promise<PracticeSet> {
+  const res = await fetch(`${BASE_URL}/practice/generate`, {
+    method: "POST",
+    headers: getHeaders(profile),
+    body: JSON.stringify(params),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || "Failed to generate practice quiz");
+  }
+  return res.json();
+}
+
+export async function submitPracticeQuiz(
+  practiceSetId: string,
+  answers: Record<string, number>,
+  profile: StudentProfile
+): Promise<PracticeSubmitResponse> {
+  const res = await fetch(`${BASE_URL}/practice/submit`, {
+    method: "POST",
+    headers: getHeaders(profile),
+    body: JSON.stringify({
+      practice_set_id: practiceSetId,
+      answers,
+    }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || "Failed to submit quiz answers");
+  }
+  return res.json();
+}
+
+export async function getPracticeHistory(
+  profile: StudentProfile
+): Promise<{ total: number; items: any[] }> {
+  const res = await fetch(`${BASE_URL}/practice/history`, {
+    headers: getHeaders(profile),
+  });
+  if (!res.ok) throw new Error("Failed to fetch practice history");
+  return res.json();
+}
+
+export async function getPracticeQuizById(
+  practiceSetId: string,
+  profile: StudentProfile
+): Promise<PracticeSet> {
+  const res = await fetch(`${BASE_URL}/practice/${practiceSetId}`, {
+    headers: getHeaders(profile),
+  });
+  if (!res.ok) throw new Error("Failed to fetch practice set");
+  return res.json();
+}
+

@@ -111,12 +111,12 @@ async def upload_document(
     academic_year = validate_metadata_field(academic_year, "academic_year")
 
     # ── Save file with sanitized name ─────────────────────
-    upload_dir = Path(settings.upload_dir)
+    upload_dir = Path(settings.upload_dir).resolve()
     upload_dir.mkdir(parents=True, exist_ok=True)
 
     clean_original = sanitize_filename(file.filename)
     safe_name = f"{uuid.uuid4().hex}_{clean_original}"
-    file_path = upload_dir / safe_name
+    file_path = (upload_dir / safe_name).resolve()
     file_path.write_bytes(content)
 
     logger.info(
@@ -324,10 +324,23 @@ async def reingest_document(
         raise HTTPException(404, "Document not found")
 
     file_path = row["file_path"]
-    if not Path(file_path).exists():
+    resolved_path = Path(file_path)
+    if not resolved_path.exists():
+        for alt in [
+            Path("backend") / file_path,
+            Path("..") / file_path,
+            Path(settings.upload_dir) / Path(file_path).name,
+            Path("backend") / settings.upload_dir / Path(file_path).name,
+        ]:
+            if alt.exists():
+                resolved_path = alt
+                break
+
+    if not resolved_path.exists():
         raise HTTPException(
             400, f"Source file no longer exists: {file_path}"
         )
+    file_path = str(resolved_path.resolve())
 
     # Reset status
     await execute(
