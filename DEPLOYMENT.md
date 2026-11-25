@@ -27,6 +27,8 @@ This guide covers deploying the full stack: **Backend** (FastAPI on Render or Fl
    backend/migrations/002_phase4.sql
    backend/migrations/003_redesign.sql
    backend/migrations/004_phase6.sql
+   backend/migrations/005_stage7_practice.sql
+   backend/migrations/006_rls_security.sql
    ```
    Paste each file into the Supabase SQL Editor and execute.
 4. Copy the **Connection string (URI)** from Settings → Database → Connection string.

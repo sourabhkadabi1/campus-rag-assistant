@@ -97,3 +97,15 @@ The local frontend and backend were started. A fresh previous-year question requ
     - Recent practice history drawer.
 - Validated TypeScript compilation: `node frontend/node_modules/typescript/bin/tsc --project frontend/tsconfig.json --noEmit` exits 0 with zero errors.
 
+
+## Supabase Security Advisor Fix (RLS & Public Schema Hardening)
+
+- Added `backend/migrations/006_rls_security.sql` and updated `backend/migrations/005_stage7_practice.sql`:
+  - Enabled Row-Level Security (`ENABLE ROW LEVEL SECURITY`) on all 17 tables in `public` (`admin_settings`, `answer_cache`, `budget_guard_settings`, `chapter_summaries`, `chat_messages`, `chat_sessions`, `chunks`, `documents`, `monthly_spend`, `payments`, `plans`, `practice_sets`, `practice_submissions`, `profiles`, `query_log`, `unit_chapter_map`, `usage_daily`).
+  - Revoked direct PostgREST `anon` and `authenticated` table privileges and added explicit `deny_public_api_access` RLS policies (`FOR ALL TO anon, authenticated USING (false) WITH CHECK (false)`), while preserving `payments` authenticated read-own policy and `postgres` backend access (`BYPASSRLS`).
+  - Fixed `function_search_path_mutable` on `public.update_search_vector()` by setting `search_path = public, pg_temp`.
+- Applied migrations `005_stage7_practice.sql` and `006_rls_security.sql` directly to the live Supabase database (`umfxrvwbxzchqkgsadae`) and verified all 17 tables report `rls_enabled = True`, `anon` queries are rejected, and backend `postgres` queries succeed.
+- Updated `DEPLOYMENT.md` to include `005_stage7_practice.sql` and `006_rls_security.sql` in the migration sequence.
+- Added `TestRlsMigrationCoverage` in `backend/tests/test_security.py`.
+
+

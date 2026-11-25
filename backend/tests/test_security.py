@@ -12,7 +12,9 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import re
 import time
+from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -259,3 +261,30 @@ class TestSanitizeTextInput:
         long_text = "B" * 3000
         result = sanitize_text_input(long_text)
         assert len(result) == 2000
+
+
+# ╔════════════════════════════════════════════════════════════════╗
+# ║  7. Supabase RLS Migration Coverage                           ║
+# ╚════════════════════════════════════════════════════════════════╝
+
+
+class TestRlsMigrationCoverage:
+    def test_all_migration_tables_have_rls_enabled(self):
+        migrations_dir = Path(__file__).resolve().parents[1] / "migrations"
+        all_tables: set[str] = set()
+        for sql_file in sorted(migrations_dir.glob("*.sql")):
+            sql_text = sql_file.read_text(encoding="utf-8")
+            for match in re.finditer(
+                r"CREATE\s+TABLE\s+IF\s+NOT\s+EXISTS\s+(?:public\.)?([a-zA-Z_][a-zA-Z0-9_]*)",
+                sql_text,
+                re.IGNORECASE,
+            ):
+                all_tables.add(match.group(1).lower())
+
+        rls_sql = (migrations_dir / "006_rls_security.sql").read_text(encoding="utf-8")
+        assert all_tables, "Expected at least one table across migrations"
+        for table in sorted(all_tables):
+            assert table in rls_sql.lower(), (
+                f"Table '{table}' is missing from 006_rls_security.sql"
+            )
+
